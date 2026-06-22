@@ -77,10 +77,19 @@ function Dashboard({ user }) {
     );
     setUpcomingCount(upcoming.length);
 
-    // Card 3: today's tasks that are completed.
-    const completed = todaysTasks.filter(
-      (task) => task.status?.toLowerCase() === "completed"
-    );
+    // Card 3: today's tasks that are completed. Repeating tasks
+    // are "completed" for today specifically via last_completed_date;
+    // one-time tasks use the permanent status field.
+    const completed = todaysTasks.filter((task) => {
+      const isRepeating =
+        task.repeat_type && task.repeat_type !== "none";
+
+      if (isRepeating) {
+        return task.last_completed_date === today;
+      }
+
+      return task.status?.toLowerCase() === "completed";
+    });
     setCompletedToday(completed.length);
 
     // Card 4: tasks originally scheduled for today that have

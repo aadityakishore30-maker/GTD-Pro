@@ -112,13 +112,29 @@ function TaskManager({ user }) {
   }
 
   async function completeTask(taskId) {
-    await supabase
-      .from("tasks")
-      .update({
-        status: "Completed",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", taskId);
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const isRepeating =
+      task.repeat_type && task.repeat_type !== "none";
+
+    if (isRepeating) {
+      // Repeating task: only mark today's occurrence as done.
+      // Status stays untouched so the task comes back on its
+      // next scheduled day instead of being archived forever.
+      await supabase
+        .from("tasks")
+        .update({ last_completed_date: today })
+        .eq("id", taskId);
+    } else {
+      await supabase
+        .from("tasks")
+        .update({
+          status: "Completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", taskId);
+    }
 
     loadTasks(selectedFolder);
   }
@@ -173,7 +189,17 @@ function TaskManager({ user }) {
   console.log("TASKS =", tasks);
 
   const activeTasks = tasks.filter((task) => {
-    if (
+    const isRepeating =
+      task.repeat_type && task.repeat_type !== "none";
+
+    if (isRepeating) {
+      // Only hide a repeating task if today's occurrence is
+      // already marked done; it returns automatically on its
+      // next scheduled day.
+      if (task.last_completed_date === today) {
+        return false;
+      }
+    } else if (
       task.status?.toLowerCase() === "completed"
     ) {
       return false;
@@ -359,12 +385,31 @@ function TaskManager({ user }) {
               task.repeat_type !== "none" && (
                 <div
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
                     fontSize: "12px",
                     color: "#8b938d",
                     marginTop: "4px",
                   }}
                 >
-                  🔁 {task.repeat_type}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M17 2l4 4-4 4" />
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <path d="M7 22l-4-4 4-4" />
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                  </svg>
+                  {task.repeat_type}
                 </div>
               )}
           </div>
