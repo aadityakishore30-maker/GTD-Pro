@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 
-function Upcoming() {
+function Upcoming({ user }) {
   const [tasks, setTasks] = useState([]);
 
   async function loadUpcomingTasks() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const now = new Date();
@@ -46,7 +42,7 @@ function Upcoming() {
 
   useEffect(() => {
     loadUpcomingTasks();
-  }, []);
+  }, [user]);
 
   function formatDate(date) {
     return new Date(date).toLocaleDateString("en-US", {

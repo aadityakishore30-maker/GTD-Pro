@@ -1,21 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "../services/supabase";
 
-function Sidebar({ setCurrentPage }) {
-  const [user, setUser] = useState(null);
+function Sidebar({ setCurrentPage, user }) {
   const [activePage, setActivePage] = useState("dashboard");
-
-  useEffect(() => {
-    async function getUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      setUser(user);
-    }
-
-    getUser();
-  }, []);
 
   async function logout() {
     await supabase.auth.signOut();

@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 
-function Archive() {
+function Archive({ user }) {
   const [tasks, setTasks] = useState([]);
 
   async function loadCompletedTasks() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data, error } = await supabase
@@ -45,7 +41,7 @@ function Archive() {
 
   useEffect(() => {
     loadCompletedTasks();
-  }, []);
+  }, [user]);
 
   return (
     <div className="card">

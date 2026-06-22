@@ -3,7 +3,7 @@ import { supabase } from "../services/supabase";
 import FolderManager from "../components/FolderManager";
 import TaskManager from "../components/TaskManager";
 
-function Dashboard() {
+function Dashboard({ user }) {
   const [totalToday, setTotalToday] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
@@ -38,10 +38,6 @@ function Dashboard() {
   }
 
   async function loadSummary() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const now = new Date();
@@ -111,7 +107,7 @@ function Dashboard() {
 
   useEffect(() => {
     loadSummary();
-  }, []);
+  }, [user]);
 
   return (
     <div>
@@ -161,8 +157,8 @@ function Dashboard() {
           alignItems: "start",
         }}
       >
-        <FolderManager />
-        <TaskManager />
+        <FolderManager user={user} />
+        <TaskManager user={user} />
       </div>
     </div>
   );

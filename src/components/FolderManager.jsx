@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 import ConfirmDialog from "../components/ConfirmDialog";
 
-function FolderManager() {
+function FolderManager({ user }) {
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState("");
 
@@ -15,10 +15,6 @@ function FolderManager() {
     useState(null);
 
   async function loadFolders() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data, error } = await supabase
@@ -37,11 +33,6 @@ function FolderManager() {
 
   async function createFolder() {
     if (!folderName.trim()) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { error } = await supabase
@@ -132,7 +123,7 @@ function FolderManager() {
 
   useEffect(() => {
     loadFolders();
-  }, []);
+  }, [user]);
 
   return (
     <div className="card">

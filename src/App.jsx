@@ -82,7 +82,7 @@ function App() {
 
   return (
     <div className="app">
-      <Sidebar setCurrentPage={setCurrentPage} />
+      <Sidebar setCurrentPage={setCurrentPage} user={session.user} />
 
       <main className="main">
         <div
@@ -153,13 +153,13 @@ function App() {
           </div>
         </div>
 
-        {currentPage === "dashboard" && <Dashboard />}
+        {currentPage === "dashboard" && <Dashboard user={session.user} />}
 
-        {currentPage === "upcoming" && <Upcoming />}
+        {currentPage === "upcoming" && <Upcoming user={session.user} />}
 
-        {currentPage === "projects" && <Projects />}
+        {currentPage === "projects" && <Projects user={session.user} />}
 
-        {currentPage === "archive" && <Archive />}
+        {currentPage === "archive" && <Archive user={session.user} />}
       </main>
     </div>
   );

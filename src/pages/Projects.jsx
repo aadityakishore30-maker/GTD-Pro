@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 import ConfirmDialog from "../components/ConfirmDialog";
 
-function Projects() {
+function Projects({ user }) {
   const [projects, setProjects] = useState([]);
   const [folders, setFolders] = useState([]);
 
@@ -13,10 +13,6 @@ function Projects() {
     useState(null);
 
   async function loadFolders() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data, error } = await supabase
@@ -38,10 +34,6 @@ function Projects() {
   }
 
   async function loadProjects() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data, error } = await supabase
@@ -60,11 +52,6 @@ function Projects() {
 
   async function createProject() {
     if (!projectName.trim() || !selectedFolder) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { error } = await supabase
@@ -132,7 +119,7 @@ function Projects() {
   useEffect(() => {
     loadFolders();
     loadProjects();
-  }, []);
+  }, [user]);
 
   function getFolderName(folderId) {
     const folder = folders.find(

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 import ConfirmDialog from "./ConfirmDialog";
 
-function TaskManager() {
+function TaskManager({ user }) {
   const [folders, setFolders] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -21,10 +21,6 @@ function TaskManager() {
     useState(null);
 
   async function loadFolders() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data } = await supabase
@@ -52,10 +48,6 @@ function TaskManager() {
   }
 
   async function loadProjects() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data } = await supabase
@@ -69,11 +61,6 @@ function TaskManager() {
 
   async function loadTasks(folderId) {
     if (!folderId) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { data } = await supabase
@@ -94,11 +81,6 @@ function TaskManager() {
 
   async function createTask() {
     if (!taskName.trim()) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) return;
 
     const { error } = await supabase
@@ -165,7 +147,7 @@ function TaskManager() {
   useEffect(() => {
     loadFolders();
     loadProjects();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (selectedFolder) {
