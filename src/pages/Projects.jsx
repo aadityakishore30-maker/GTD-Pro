@@ -5,6 +5,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 function Projects({ user }) {
   const [projects, setProjects] = useState([]);
   const [folders, setFolders] = useState([]);
+  const [tasks, setTasks] = useState([]);
 
   const [projectName, setProjectName] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("");
@@ -50,6 +51,24 @@ function Projects({ user }) {
     setProjects(data || []);
   }
 
+  // Pulled once so every project card can compute its own
+  // "X of Y tasks done" without a separate query per card.
+  async function loadTaskCounts() {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("id, project_id, status, repeat_type, last_completed_date")
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setTasks(data || []);
+  }
+
   async function createProject() {
     if (!projectName.trim() || !selectedFolder) return;
     if (!user) return;
@@ -76,31 +95,20 @@ function Projects({ user }) {
   }
 
   async function deleteProject(projectId) {
-    console.log("Deleting project:", projectId);
-
-    const { data: taskData, error: tasksError } = await supabase
+    const { error: tasksError } = await supabase
       .from("tasks")
       .delete()
-      .eq("project_id", projectId)
-      .select();
-
-    console.log("Tasks deleted:", taskData);
-    console.log("Tasks error:", tasksError);
+      .eq("project_id", projectId);
 
     if (tasksError) {
       alert(tasksError.message);
       return;
     }
 
-    const { data: projectData, error: projectError } =
-      await supabase
-        .from("projects")
-        .delete()
-        .eq("id", projectId)
-        .select();
-
-    console.log("Project deleted:", projectData);
-    console.log("Project error:", projectError);
+    const { error: projectError } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
 
     if (projectError) {
       alert(projectError.message);
@@ -114,11 +122,13 @@ function Projects({ user }) {
     setProjectPendingDelete(null);
 
     await loadProjects();
+    await loadTaskCounts();
   }
 
   useEffect(() => {
     loadFolders();
     loadProjects();
+    loadTaskCounts();
   }, [user]);
 
   function getFolderName(folderId) {
@@ -127,6 +137,38 @@ function Projects({ user }) {
     );
 
     return folder?.name || "No Folder";
+  }
+
+  const now = new Date();
+  const today =
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0");
+
+  function isTaskDone(task) {
+    const isRepeating =
+      task.repeat_type && task.repeat_type !== "none";
+
+    if (isRepeating) {
+      return task.last_completed_date === today;
+    }
+
+    return task.status?.toLowerCase() === "completed";
+  }
+
+  function getProjectStats(projectId) {
+    const projectTasks = tasks.filter(
+      (task) => String(task.project_id) === String(projectId)
+    );
+
+    const total = projectTasks.length;
+    const completed = projectTasks.filter(isTaskDone).length;
+    const percent =
+      total === 0 ? 0 : Math.round((completed / total) * 100);
+
+    return { total, completed, percent };
   }
 
   return (
@@ -191,65 +233,79 @@ function Projects({ user }) {
         </div>
       )}
 
-      {projects.map((project) => (
-        <div
-          key={project.id}
-          className="task-row"
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              flex: 1,
-            }}
-          >
-            <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "600",
-              }}
-            >
-              {project.name}
-            </div>
+      {projects.length > 0 && (
+        <div className="project-grid">
+          {projects.map((project) => {
+            const { total, completed, percent } =
+              getProjectStats(project.id);
 
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#8a8a8a",
-                marginTop: "4px",
-              }}
-            >
-              Folder: {getFolderName(project.folder_id)}
-            </div>
-          </div>
+            return (
+              <div
+                key={project.id}
+                className="project-card"
+              >
+                <button
+                  className="del"
+                  title="Delete project"
+                  onClick={() =>
+                    setProjectPendingDelete(project)
+                  }
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                </button>
 
-          <button
-            className="delete-icon"
-            title="Delete project"
-            onClick={() =>
-              setProjectPendingDelete(project)
-            }
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M8 6V4h8v2" />
-              <path d="M19 6l-1 14H6L5 6" />
-              <path d="M10 11v6" />
-              <path d="M14 11v6" />
-            </svg>
-          </button>
+                <div className="project-name">
+                  {project.name}
+                </div>
+
+                <div className="project-folder">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                  </svg>
+                  Folder: {getFolderName(project.folder_id)}
+                </div>
+
+                <div className="project-progress-bar">
+                  <div
+                    className="project-progress-fill"
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+
+                <div className="project-stats">
+                  {completed} of {total} tasks done · {percent}%
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
 
       <ConfirmDialog
         open={projectPendingDelete !== null}
