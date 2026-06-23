@@ -748,7 +748,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .project-card {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--sage);
   border-radius: 12px;
   padding: 18px 18px 16px;
   cursor: pointer;
@@ -802,23 +801,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--slate-light);
   margin-top: 7px;
   font-weight: 500;
-}
-
-.project-card .del {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  color: var(--slate-light);
-}
-
-.project-card:hover .del {
-  opacity: 1;
-}
-
-.project-card .del:hover {
-  color: var(--coral);
 }
 
 .project-detail {
