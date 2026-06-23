@@ -1,40 +1,44 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 
+const PAGE_SIZE = 10;
+
 function Archive({ user }) {
   const [tasks, setTasks] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  async function loadCompletedTasks() {
+  // reset = true: fresh load (first 10, replaces the list)
+  // reset = false: "See more" load (next 10, appended to the list)
+  async function loadCompletedTasks(reset) {
     if (!user) return;
+
+    const from = reset ? 0 : tasks.length;
+    const to = from + PAGE_SIZE - 1;
 
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
       .eq("user_id", user.id)
-      .or("status.eq.Completed,last_completed_date.not.is.null");
+      .or("status.eq.Completed,last_completed_date.not.is.null")
+      .order("completed_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error(error);
       return;
     }
 
-    // Repeating tasks use last_completed_date, one-time tasks use
-    // completed_at. Sort everything together by whichever applies.
-    const sorted = (data || []).slice().sort((a, b) => {
-      const aTime = a.last_completed_date
-        ? new Date(a.last_completed_date).getTime()
-        : a.completed_at
-        ? new Date(a.completed_at).getTime()
-        : 0;
-      const bTime = b.last_completed_date
-        ? new Date(b.last_completed_date).getTime()
-        : b.completed_at
-        ? new Date(b.completed_at).getTime()
-        : 0;
-      return bTime - aTime;
-    });
+    const page = data || [];
 
-    setTasks(sorted);
+    setTasks((prev) => (reset ? page : [...prev, ...page]));
+    setHasMore(page.length === PAGE_SIZE);
+  }
+
+  async function handleSeeMore() {
+    setLoadingMore(true);
+    await loadCompletedTasks(false);
+    setLoadingMore(false);
   }
 
   async function restoreTask(task) {
@@ -45,7 +49,7 @@ function Archive({ user }) {
     // shows back up in Today's list right away.
     // One-time tasks: fully un-complete them, same as before.
     const updates = isRepeating
-      ? { last_completed_date: null }
+      ? { last_completed_date: null, completed_at: null }
       : { status: "Inbox", completed_at: null };
 
     const { error } = await supabase
@@ -58,11 +62,13 @@ function Archive({ user }) {
       return;
     }
 
-    loadCompletedTasks();
+    // Restoring changes the underlying set, so refresh back to
+    // page one rather than trying to patch the loaded pages.
+    loadCompletedTasks(true);
   }
 
   useEffect(() => {
-    loadCompletedTasks();
+    loadCompletedTasks(true);
   }, [user]);
 
   return (
@@ -146,6 +152,23 @@ function Archive({ user }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {hasMore && tasks.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: "20px",
+          }}
+        >
+          <button
+            onClick={handleSeeMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading..." : "See more"}
+          </button>
         </div>
       )}
     </div>

@@ -119,12 +119,17 @@ function TaskManager({ user }) {
       task.repeat_type && task.repeat_type !== "none";
 
     if (isRepeating) {
-      // Repeating task: only mark today's occurrence as done.
+      // Repeating task: mark today's occurrence as done.
       // Status stays untouched so the task comes back on its
       // next scheduled day instead of being archived forever.
+      // completed_at is also stamped here purely so Archive can
+      // sort/paginate every completed task on one shared column.
       await supabase
         .from("tasks")
-        .update({ last_completed_date: today })
+        .update({
+          last_completed_date: today,
+          completed_at: new Date().toISOString(),
+        })
         .eq("id", taskId);
     } else {
       await supabase
