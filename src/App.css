@@ -974,3 +974,75 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .project-pill svg {
   flex-shrink: 0;
 }
+
+.captured-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.captured-row {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+}
+
+.captured-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.captured-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1c2128;
+}
+
+.captured-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--amber);
+  background: var(--amber-pale);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.captured-source a {
+  color: var(--sage-deep);
+  text-decoration: underline;
+}
+
+.captured-notes {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  max-height: 110px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.captured-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.captured-fields select,
+.captured-fields input[type="date"] {
+  height: 34px;
+  font-size: 13px;
+}

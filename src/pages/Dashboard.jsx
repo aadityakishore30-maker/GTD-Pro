@@ -51,7 +51,8 @@ function Dashboard({ user }) {
     const { data: allTasks, error } = await supabase
       .from("tasks")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .not("folder_id", "is", null);
 
     if (error) {
       console.error(error);

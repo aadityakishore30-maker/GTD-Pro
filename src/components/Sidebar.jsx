@@ -70,6 +70,15 @@ function Sidebar({ setCurrentPage, user }) {
         >
           Archive
         </div>
+
+        <div
+          className={`menu-item ${
+            activePage === "captured" ? "active" : ""
+          }`}
+          onClick={() => navigate("captured")}
+        >
+          Captured
+        </div>
       </div>
 
       <div

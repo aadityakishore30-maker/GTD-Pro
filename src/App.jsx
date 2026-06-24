@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Upcoming from "./pages/Upcoming";
 import Archive from "./pages/Archive";
+import Captured from "./pages/Captured";
 
 import "./App.css";
 
@@ -56,6 +57,9 @@ function App() {
       case "archive":
         return "Archive";
 
+      case "captured":
+        return "Captured";
+
       default:
         return "Captur";
     }
@@ -74,6 +78,9 @@ function App() {
 
       case "archive":
         return "Completed work, safely stored away.";
+
+      case "captured":
+        return "Newly arrived, waiting to be sorted.";
 
       default:
         return "";
@@ -160,6 +167,8 @@ function App() {
         {currentPage === "projects" && <Projects user={session.user} />}
 
         {currentPage === "archive" && <Archive user={session.user} />}
+
+        {currentPage === "captured" && <Captured user={session.user} />}
       </main>
     </div>
   );
