@@ -7,7 +7,7 @@ function Dashboard({ user }) {
   const [totalToday, setTotalToday] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
-  const [rescheduledToday, setRescheduledToday] = useState(0);
+  const [pendingOrganize, setPendingOrganize] = useState(0);
   const [percentDone, setPercentDone] = useState(0);
 
   // Same recurrence-aware "is this task relevant today" check used
@@ -93,17 +93,20 @@ function Dashboard({ user }) {
     });
     setCompletedToday(completed.length);
 
-    // Card 4: tasks originally scheduled for today that have
-    // since been moved to a different date. Relies on
-    // original_scheduled_date, which is set once when a task
-    // first receives a date and never overwritten afterward.
-    const rescheduled = tasks.filter(
-      (task) =>
-        task.original_scheduled_date === today &&
-        task.scheduled_date &&
-        task.scheduled_date !== today
-    );
-    setRescheduledToday(rescheduled.length);
+    // Card 4: items captured from Gmail/Chat that haven't been
+    // organized yet (no folder assigned). Queried separately
+    // since the main task list above deliberately excludes them.
+    const { count: pendingCount, error: pendingError } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("folder_id", null);
+
+    if (pendingError) {
+      console.error(pendingError);
+    } else {
+      setPendingOrganize(pendingCount || 0);
+    }
 
     // Card 5: percentage of today's scheduled tasks completed.
     const percent =
@@ -147,8 +150,8 @@ function Dashboard({ user }) {
         </div>
 
         <div className="card summary-card">
-          <div className="summary-label">Rescheduled</div>
-          <div className="summary-number">{rescheduledToday}</div>
+          <div className="summary-label">Pending to Organize</div>
+          <div className="summary-number">{pendingOrganize}</div>
         </div>
 
         <div className="card summary-card">
