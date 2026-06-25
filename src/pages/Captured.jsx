@@ -70,6 +70,8 @@ function Captured({ user }) {
       captured.forEach((task) => {
         if (!next[task.id]) {
           next[task.id] = {
+            title: task.title || "",
+            notes: task.notes || "",
             folder_id: "",
             project_id: "",
             scheduled_date: task.scheduled_date || "",
@@ -109,9 +111,16 @@ function Captured({ user }) {
       return;
     }
 
+    if (!edit.title?.trim()) {
+      alert("This task needs a title before organizing it.");
+      return;
+    }
+
     const { error } = await supabase
       .from("tasks")
       .update({
+        title: edit.title.trim(),
+        notes: edit.notes || null,
         folder_id: edit.folder_id,
         project_id: edit.project_id || null,
         scheduled_date: edit.scheduled_date || null,
@@ -175,6 +184,8 @@ function Captured({ user }) {
         <div className="captured-list">
           {tasks.map((task) => {
             const edit = edits[task.id] || {
+              title: task.title || "",
+              notes: task.notes || "",
               folder_id: "",
               project_id: "",
               scheduled_date: "",
@@ -184,9 +195,18 @@ function Captured({ user }) {
             return (
               <div key={task.id} className="captured-row">
                 <div className="captured-header">
-                  <div className="captured-title">
-                    {task.title}
-                  </div>
+                  <input
+                    className="captured-title-input"
+                    value={edit.title}
+                    onChange={(e) =>
+                      updateEdit(
+                        task.id,
+                        "title",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Task title"
+                  />
 
                   <button
                     className="delete-icon"
@@ -231,11 +251,19 @@ function Captured({ user }) {
                   </div>
                 )}
 
-                {task.notes && (
-                  <div className="captured-notes">
-                    {task.notes}
-                  </div>
-                )}
+                <textarea
+                  className="captured-notes-input"
+                  value={edit.notes}
+                  onChange={(e) =>
+                    updateEdit(
+                      task.id,
+                      "notes",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Notes / description"
+                  rows={3}
+                />
 
                 <div className="captured-fields">
                   <select

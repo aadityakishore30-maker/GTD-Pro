@@ -995,10 +995,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 10px;
 }
 
-.captured-title {
+.captured-title-input {
+  flex: 1;
   font-weight: 600;
   font-size: 15px;
   color: #1c2128;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  margin: -4px -6px;
+  font-family: inherit;
+}
+
+.captured-title-input:hover,
+.captured-title-input:focus {
+  border-color: var(--line);
+  background: var(--paper);
+}
+
+.captured-notes-input {
+  margin-top: 10px;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: var(--slate);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  resize: vertical;
 }
 
 .captured-source {
