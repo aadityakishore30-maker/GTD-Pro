@@ -64,20 +64,20 @@ function Sidebar({ setCurrentPage, user }) {
 
         <div
           className={`menu-item ${
-            activePage === "archive" ? "active" : ""
-          }`}
-          onClick={() => navigate("archive")}
-        >
-          Archive
-        </div>
-
-        <div
-          className={`menu-item ${
             activePage === "captured" ? "active" : ""
           }`}
           onClick={() => navigate("captured")}
         >
           Captured
+        </div>
+
+        <div
+          className={`menu-item ${
+            activePage === "archive" ? "active" : ""
+          }`}
+          onClick={() => navigate("archive")}
+        >
+          Archive
         </div>
       </div>
 
