@@ -18,7 +18,7 @@ function Sidebar({ setCurrentPage, user }) {
     <aside
       className="sidebar"
       style={{
-        width: "300px",
+        width: "248px",
         height: "100vh",
         display: "flex",
         flexDirection: "column",
