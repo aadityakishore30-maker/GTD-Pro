@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../services/supabase";
+import logo from "../assets/Screenshot_2026-06-19_143129-removebg-preview.webp";
 
 function Sidebar({ setCurrentPage, user }) {
   const [activePage, setActivePage] = useState("dashboard");
@@ -32,7 +33,7 @@ function Sidebar({ setCurrentPage, user }) {
         }}
       >
         <div className="logo">
-  Captur.
+  <img src={logo} alt="Captur." />
 </div>
 
         <div
