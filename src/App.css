@@ -741,6 +741,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* ---------- PROJECTS ---------- */
 
+.project-folder-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.project-folder-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--slate-light);
+  margin-bottom: 12px;
+}
+
 .project-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
