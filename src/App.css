@@ -533,7 +533,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .task-row:hover {
   background: var(--paper);
-  border-color: #d7d2c4;
   transform: none;
 }
 
