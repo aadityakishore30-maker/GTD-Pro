@@ -3,12 +3,36 @@ import { supabase } from "../services/supabase";
 
 function Upcoming({ user }) {
   const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [folders, setFolders] = useState([]);
+
+  async function loadProjects() {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("name");
+
+    setProjects(data || []);
+  }
+
+  async function loadFolders() {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("folders")
+      .select("*")
+      .eq("user_id", user.id);
+
+    setFolders(data || []);
+  }
 
   async function loadUpcomingTasks() {
     if (!user) return;
 
     const now = new Date();
-
     const today =
       now.getFullYear() +
       "-" +
@@ -18,15 +42,7 @@ function Upcoming({ user }) {
 
     const { data, error } = await supabase
       .from("tasks")
-      .select(`
-        *,
-        folders (
-          name
-        ),
-        projects (
-          name
-        )
-      `)
+      .select(`*, folders (name), projects (id, name)`)
       .eq("user_id", user.id)
       .gt("scheduled_date", today)
       .neq("status", "Completed")
@@ -41,6 +57,8 @@ function Upcoming({ user }) {
   }
 
   useEffect(() => {
+    loadFolders();
+    loadProjects();
     loadUpcomingTasks();
   }, [user]);
 
@@ -52,7 +70,13 @@ function Upcoming({ user }) {
     });
   }
 
-  // Group tasks by scheduled_date
+  function projectsForTask(task) {
+    if (!task.folder_id) return [];
+    return projects.filter(
+      (p) => String(p.folder_id) === String(task.folder_id)
+    );
+  }
+
   const groupedTasks = tasks.reduce((acc, task) => {
     const date = task.scheduled_date;
     if (!acc[date]) acc[date] = [];
@@ -65,13 +89,24 @@ function Upcoming({ user }) {
   return (
     <div>
       {sortedDates.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: "40px", color: "#8b938d" }}>
+        <div
+          className="card"
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "#8b938d",
+          }}
+        >
           No upcoming tasks scheduled.
         </div>
       )}
 
       {sortedDates.map((date) => (
-        <div key={date} className="card" style={{ marginBottom: "16px" }}>
+        <div
+          key={date}
+          className="card"
+          style={{ marginBottom: "16px" }}
+        >
           {/* Date header */}
           <div
             style={{
@@ -102,11 +137,11 @@ function Upcoming({ user }) {
                 fontWeight: "500",
               }}
             >
-              {groupedTasks[date].length} task{groupedTasks[date].length !== 1 ? "s" : ""}
+              {groupedTasks[date].length} task
+              {groupedTasks[date].length !== 1 ? "s" : ""}
             </span>
           </div>
 
-          {/* Tasks for this date */}
           {groupedTasks[date].map((task) => (
             <div
               key={task.id}
@@ -168,25 +203,26 @@ function Upcoming({ user }) {
                     </span>
                   )}
 
-                  {task.repeat_type && task.repeat_type !== "none" && (
-                    <span className="project-pill">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M17 2l4 4-4 4" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <path d="M7 22l-4-4 4-4" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                      </svg>
-                      {task.repeat_type}
-                    </span>
-                  )}
+                  {task.repeat_type &&
+                    task.repeat_type !== "none" && (
+                      <span className="project-pill">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M17 2l4 4-4 4" />
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                          <path d="M7 22l-4-4 4-4" />
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                        </svg>
+                        {task.repeat_type}
+                      </span>
+                    )}
 
                   {task.source_url && (
                     <a
@@ -215,21 +251,52 @@ function Upcoming({ user }) {
                 </div>
               </div>
 
+              {/* Inline edit controls */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
                   marginLeft: "auto",
+                  flexShrink: 0,
                 }}
               >
+                {/* Project dropdown */}
+                <select
+                  value={task.project_id || ""}
+                  onChange={async (e) => {
+                    await supabase
+                      .from("tasks")
+                      .update({
+                        project_id: e.target.value || null,
+                      })
+                      .eq("id", task.id);
+                    loadUpcomingTasks();
+                  }}
+                  style={{
+                    width: "130px",
+                    height: "32px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <option value="">No project</option>
+                  {projectsForTask(task).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Date picker */}
                 <input
                   type="date"
                   value={task.scheduled_date || ""}
                   onChange={async (e) => {
                     await supabase
                       .from("tasks")
-                      .update({ scheduled_date: e.target.value })
+                      .update({
+                        scheduled_date: e.target.value,
+                      })
                       .eq("id", task.id);
                     loadUpcomingTasks();
                   }}
@@ -240,12 +307,15 @@ function Upcoming({ user }) {
                   }}
                 />
 
+                {/* Repeat picker */}
                 <select
                   value={task.repeat_type || "none"}
                   onChange={async (e) => {
                     await supabase
                       .from("tasks")
-                      .update({ repeat_type: e.target.value })
+                      .update({
+                        repeat_type: e.target.value,
+                      })
                       .eq("id", task.id);
                     loadUpcomingTasks();
                   }}

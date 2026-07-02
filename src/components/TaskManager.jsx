@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../services/supabase";
 import ConfirmDialog from "./ConfirmDialog";
 
@@ -12,13 +12,15 @@ function TaskManager({ user }) {
   );
 
   const [selectedProject, setSelectedProject] = useState("");
-
   const [taskName, setTaskName] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [repeatType, setRepeatType] = useState("none");
+  const [taskPendingDelete, setTaskPendingDelete] = useState(null);
 
-  const [taskPendingDelete, setTaskPendingDelete] =
-    useState(null);
+  // Drag state — all stored in a ref so re-renders don't
+  // interfere mid-drag.
+  const dragIndex = useRef(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   async function loadFolders() {
     if (!user) return;
@@ -31,14 +33,12 @@ function TaskManager({ user }) {
 
     setFolders(data || []);
 
-    const savedFolder =
-      localStorage.getItem("selectedFolder");
+    const savedFolder = localStorage.getItem("selectedFolder");
 
     if (
       savedFolder &&
       data?.some(
-        (folder) =>
-          String(folder.id) === String(savedFolder)
+        (folder) => String(folder.id) === String(savedFolder)
       )
     ) {
       setSelectedFolder(savedFolder);
@@ -65,15 +65,10 @@ function TaskManager({ user }) {
 
     const { data } = await supabase
       .from("tasks")
-      .select(`
-        *,
-        projects (
-          id,
-          name
-        )
-      `)
+      .select(`*, projects (id, name)`)
       .eq("folder_id", folderId)
       .eq("user_id", user.id)
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     setTasks(data || []);
@@ -83,20 +78,18 @@ function TaskManager({ user }) {
     if (!taskName.trim()) return;
     if (!user) return;
 
-    const { error } = await supabase
-      .from("tasks")
-      .insert([
-        {
-          title: taskName,
-          folder_id: selectedFolder,
-          user_id: user.id,
-          project_id: selectedProject || null,
-          scheduled_date: scheduledDate || null,
-          original_scheduled_date: scheduledDate || null,
-          repeat_type: repeatType,
-          status: "Inbox",
-        },
-      ]);
+    const { error } = await supabase.from("tasks").insert([
+      {
+        title: taskName,
+        folder_id: selectedFolder,
+        user_id: user.id,
+        project_id: selectedProject || null,
+        scheduled_date: scheduledDate || null,
+        original_scheduled_date: scheduledDate || null,
+        repeat_type: repeatType,
+        status: "Inbox",
+      },
+    ]);
 
     if (error) {
       alert(error.message);
@@ -119,11 +112,6 @@ function TaskManager({ user }) {
       task.repeat_type && task.repeat_type !== "none";
 
     if (isRepeating) {
-      // Repeating task: mark today's occurrence as done.
-      // Status stays untouched so the task comes back on its
-      // next scheduled day instead of being archived forever.
-      // completed_at is also stamped here purely so Archive can
-      // sort/paginate every completed task on one shared column.
       await supabase
         .from("tasks")
         .update({
@@ -145,25 +133,64 @@ function TaskManager({ user }) {
   }
 
   async function deleteTask(taskId) {
-  console.log("Deleting task:", taskId);
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId);
 
-  const { data, error } = await supabase
-    .from("tasks")
-    .delete()
-    .eq("id", taskId)
-    .select();
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-  console.log("Delete result:", data);
-  console.log("Delete error:", error);
-
-  if (error) {
-    alert(error.message);
-    return;
+    setTaskPendingDelete(null);
+    loadTasks(selectedFolder);
   }
 
-  setTaskPendingDelete(null);
-  loadTasks(selectedFolder);
-}
+  // --- Drag handlers ---
+
+  function handleDragStart(index) {
+    dragIndex.current = index;
+  }
+
+  function handleDragEnter(index) {
+    setDragOverIndex(index);
+  }
+
+  async function handleDrop(dropIndex) {
+    const from = dragIndex.current;
+    if (from === null || from === dropIndex) {
+      dragIndex.current = null;
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Reorder the active task list in memory first for instant
+    // visual feedback, then persist the new order to Supabase.
+    const reordered = [...activeTasks];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    // Assign a fresh integer sort_order (0, 1, 2, …) to every
+    // task in the reordered list and write them all at once.
+    const updates = reordered.map((task, idx) =>
+      supabase
+        .from("tasks")
+        .update({ sort_order: idx })
+        .eq("id", task.id)
+    );
+
+    await Promise.all(updates);
+
+    dragIndex.current = null;
+    setDragOverIndex(null);
+    loadTasks(selectedFolder);
+  }
+
+  function handleDragEnd() {
+    dragIndex.current = null;
+    setDragOverIndex(null);
+  }
 
   useEffect(() => {
     loadFolders();
@@ -172,11 +199,7 @@ function TaskManager({ user }) {
 
   useEffect(() => {
     if (selectedFolder) {
-      localStorage.setItem(
-        "selectedFolder",
-        selectedFolder
-      );
-
+      localStorage.setItem("selectedFolder", selectedFolder);
       loadTasks(selectedFolder);
     }
   }, [selectedFolder]);
@@ -190,83 +213,60 @@ function TaskManager({ user }) {
     "-" +
     String(now.getDate()).padStart(2, "0");
 
-  console.log("TODAY =", today);
-  console.log("TASKS =", tasks);
-
   const activeTasks = tasks.filter((task) => {
     const isRepeating =
       task.repeat_type && task.repeat_type !== "none";
 
     if (isRepeating) {
-      // Only hide a repeating task if today's occurrence is
-      // already marked done; it returns automatically on its
-      // next scheduled day.
-      if (task.last_completed_date === today) {
-        return false;
-      }
-    } else if (
-      task.status?.toLowerCase() === "completed"
-    ) {
+      if (task.last_completed_date === today) return false;
+    } else if (task.status?.toLowerCase() === "completed") {
       return false;
     }
 
-    if (!task.scheduled_date) {
-      return true;
-    }
-
-    if (task.repeat_type === "daily") {
-      return true;
-    }
+    if (!task.scheduled_date) return true;
+    if (task.repeat_type === "daily") return true;
 
     if (task.repeat_type === "weekly") {
       const todayDay = new Date().getDay();
-      const taskDay = new Date(
-        task.scheduled_date
-      ).getDay();
-
+      const taskDay = new Date(task.scheduled_date).getDay();
       return todayDay === taskDay;
     }
 
     if (task.repeat_type === "monthly") {
       const todayDate = new Date().getDate();
-      const taskDate = new Date(
-        task.scheduled_date
-      ).getDate();
-
+      const taskDate = new Date(task.scheduled_date).getDate();
       return todayDate === taskDate;
     }
 
     return task.scheduled_date === today;
   });
 
+  // Projects that belong to the currently selected folder.
+  const folderProjects = projects.filter(
+    (p) => String(p.folder_id) === String(selectedFolder)
+  );
+
   return (
     <div className="card">
-      <h2 style={{ marginBottom: "20px" }}>
-        Today's Tasks
-      </h2>
+      <h2 style={{ marginBottom: "20px" }}>Today's Tasks</h2>
 
       <select
         value={selectedFolder}
-        onChange={(e) =>
-          setSelectedFolder(e.target.value)
-        }
+        onChange={(e) => setSelectedFolder(e.target.value)}
         style={{ marginBottom: "20px" }}
       >
         {folders.map((folder) => (
-          <option
-            key={folder.id}
-            value={folder.id}
-          >
+          <option key={folder.id} value={folder.id}>
             {folder.name}
           </option>
         ))}
       </select>
 
+      {/* New task row */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns:
-            "2fr 170px 150px 140px auto",
+          gridTemplateColumns: "2fr 160px 150px 140px auto",
           gap: "10px",
           marginBottom: "24px",
           alignItems: "center",
@@ -274,67 +274,40 @@ function TaskManager({ user }) {
       >
         <input
           value={taskName}
-          onChange={(e) =>
-            setTaskName(e.target.value)
-          }
+          onChange={(e) => setTaskName(e.target.value)}
           placeholder="New task..."
+          onKeyDown={(e) => e.key === "Enter" && createTask()}
         />
 
         <select
           value={selectedProject}
-          onChange={(e) =>
-            setSelectedProject(e.target.value)
-          }
+          onChange={(e) => setSelectedProject(e.target.value)}
         >
           <option value="">Project</option>
-
-          {projects
-            .filter(
-              (project) =>
-                String(project.folder_id) ===
-                String(selectedFolder)
-            )
-            .map((project) => (
-              <option
-                key={project.id}
-                value={project.id}
-              >
-                {project.name}
-              </option>
-            ))}
+          {folderProjects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
         </select>
 
         <input
           type="date"
           value={scheduledDate}
-          onChange={(e) =>
-            setScheduledDate(e.target.value)
-          }
+          onChange={(e) => setScheduledDate(e.target.value)}
         />
 
         <select
           value={repeatType}
-          onChange={(e) =>
-            setRepeatType(e.target.value)
-          }
+          onChange={(e) => setRepeatType(e.target.value)}
         >
-          <option value="none">
-            No Repeat
-          </option>
-          <option value="daily">
-            Daily
-          </option>
-          <option value="weekly">
-            Weekly
-          </option>
-          <option value="monthly">
-            Monthly
-          </option>
+          <option value="none">No Repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
         </select>
 
-        <button onClick={createTask}>
-          Add
-        </button>
+        <button onClick={createTask}>Add</button>
       </div>
 
       {activeTasks.length === 0 && (
@@ -349,16 +322,52 @@ function TaskManager({ user }) {
         </div>
       )}
 
-      {activeTasks.map((task) => (
+      {activeTasks.map((task, index) => (
         <div
           key={task.id}
           className="task-row"
+          draggable
+          onDragStart={() => handleDragStart(index)}
+          onDragEnter={() => handleDragEnter(index)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => handleDrop(index)}
+          onDragEnd={handleDragEnd}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "12px",
+            gap: "10px",
+            opacity:
+              dragIndex.current === index ? 0.4 : 1,
+            borderTop:
+              dragOverIndex === index &&
+              dragIndex.current !== index
+                ? "2px solid var(--sage)"
+                : "2px solid transparent",
+            transition: "border-color 0.1s ease",
           }}
         >
+          {/* Drag handle */}
+          <div
+            className="drag-handle"
+            title="Drag to reorder"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </div>
+
           <input
             type="checkbox"
             onChange={() => completeTask(task.id)}
@@ -372,10 +381,7 @@ function TaskManager({ user }) {
             }}
           >
             <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "600",
-              }}
+              style={{ fontSize: "14px", fontWeight: "600" }}
             >
               {task.title}
             </div>
@@ -414,12 +420,6 @@ function TaskManager({ user }) {
               </a>
             )}
 
-            {task.projects?.name && (
-              <div className="project-pill">
-                {task.projects.name}
-              </div>
-            )}
-
             {task.repeat_type &&
               task.repeat_type !== "none" && (
                 <div
@@ -453,6 +453,7 @@ function TaskManager({ user }) {
               )}
           </div>
 
+          {/* Inline edit controls */}
           <div
             style={{
               display: "flex",
@@ -461,6 +462,33 @@ function TaskManager({ user }) {
               marginLeft: "auto",
             }}
           >
+            {/* Project dropdown */}
+            <select
+              value={task.project_id || ""}
+              onChange={async (e) => {
+                await supabase
+                  .from("tasks")
+                  .update({
+                    project_id: e.target.value || null,
+                  })
+                  .eq("id", task.id);
+                loadTasks(selectedFolder);
+              }}
+              style={{
+                width: "130px",
+                height: "32px",
+                fontSize: "12px",
+              }}
+            >
+              <option value="">No project</option>
+              {folderProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Date picker */}
             <input
               type="date"
               value={task.scheduled_date || ""}
@@ -468,17 +496,14 @@ function TaskManager({ user }) {
                 const update = {
                   scheduled_date: e.target.value,
                 };
-
                 if (!task.original_scheduled_date) {
                   update.original_scheduled_date =
                     e.target.value;
                 }
-
                 await supabase
                   .from("tasks")
                   .update(update)
                   .eq("id", task.id);
-
                 loadTasks(selectedFolder);
               }}
               style={{
@@ -488,16 +513,14 @@ function TaskManager({ user }) {
               }}
             />
 
+            {/* Repeat picker */}
             <select
               value={task.repeat_type || "none"}
               onChange={async (e) => {
                 await supabase
                   .from("tasks")
-                  .update({
-                    repeat_type: e.target.value,
-                  })
+                  .update({ repeat_type: e.target.value })
                   .eq("id", task.id);
-
                 loadTasks(selectedFolder);
               }}
               style={{
@@ -511,40 +534,31 @@ function TaskManager({ user }) {
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
             </select>
-          </div>
 
-          <button
-  className="delete-icon"
-  title="Delete task"
-  onClick={() => setTaskPendingDelete(task)}
-  style={{
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    padding: "4px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  }}
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 6h18" />
-    <path d="M8 6V4h8v2" />
-    <path d="M19 6l-1 14H6L5 6" />
-    <path d="M10 11v6" />
-    <path d="M14 11v6" />
-  </svg>
-</button>
+            <button
+              className="delete-icon"
+              title="Delete task"
+              onClick={() => setTaskPendingDelete(task)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>
+          </div>
         </div>
       ))}
 

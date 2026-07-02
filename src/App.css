@@ -387,13 +387,24 @@ button {
   gap: 6px;
 }
 
-.delete-icon {
-  all: unset;
-  cursor: pointer;
+.drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fca5a5;
+  color: var(--slate-light);
+  cursor: grab;
+  padding: 4px 2px;
+  flex-shrink: 0;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.task-row:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 button:hover {
