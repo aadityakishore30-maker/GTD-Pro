@@ -2,119 +2,117 @@ import { useState } from "react";
 import { supabase } from "../services/supabase";
 import logo from "../assets/Screenshot_2026-06-19_143129-removebg-preview.webp";
 
-function Sidebar({ setCurrentPage, user }) {
+function Sidebar({ setCurrentPage, user, onDragToUpcoming }) {
   const [activePage, setActivePage] = useState("dashboard");
-
-  async function logout() {
-    await supabase.auth.signOut();
-  }
+  const [upcomingDragOver, setUpcomingDragOver] = useState(false);
 
   function navigate(page) {
     setActivePage(page);
     setCurrentPage(page);
   }
 
+  async function logout() {
+    await supabase.auth.signOut();
+  }
+
+  // ── Drag-to-Upcoming handlers ──────────────────────────────
+  function handleUpcomingDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setUpcomingDragOver(true);
+  }
+
+  function handleUpcomingDragLeave() {
+    setUpcomingDragOver(false);
+  }
+
+  function handleUpcomingDrop(e) {
+    e.preventDefault();
+    setUpcomingDragOver(false);
+
+    const taskId = e.dataTransfer.getData("taskId");
+    if (taskId && onDragToUpcoming) {
+      onDragToUpcoming(taskId);
+    }
+  }
+
+  const initial = user?.email
+    ? user.email[0].toUpperCase()
+    : "U";
+
   return (
     <aside
       className="sidebar"
-      style={{
-        width: "248px",
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        position: "sticky",
-        top: 0,
-      }}
+      style={{ width: "248px", minHeight: "100vh" }}
     >
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-        }}
-      >
-        <div className="logo">
-  <img src={logo} alt="Captur." />
-</div>
+      <div className="logo">
+        <img src={logo} alt="Captur." />
+      </div>
 
+      <nav>
         <div
-          className={`menu-item ${
-            activePage === "dashboard" ? "active" : ""
-          }`}
+          className={`menu-item ${activePage === "dashboard" ? "active" : ""}`}
           onClick={() => navigate("dashboard")}
         >
           Today
         </div>
 
+        {/* "Upcoming" accepts task drops from TaskManager */}
         <div
-          className={`menu-item ${
-            activePage === "upcoming" ? "active" : ""
-          }`}
+          className={`menu-item ${activePage === "upcoming" ? "active" : ""}`}
           onClick={() => navigate("upcoming")}
+          onDragOver={handleUpcomingDragOver}
+          onDragLeave={handleUpcomingDragLeave}
+          onDrop={handleUpcomingDrop}
+          style={upcomingDragOver ? {
+            background: "var(--sage-pale)",
+            border: "2px dashed var(--sage)",
+            color: "var(--sage-deep)",
+          } : {}}
         >
           Upcoming
         </div>
 
         <div
-          className={`menu-item ${
-            activePage === "projects" ? "active" : ""
-          }`}
+          className={`menu-item ${activePage === "projects" ? "active" : ""}`}
           onClick={() => navigate("projects")}
         >
           Projects
         </div>
 
         <div
-          className={`menu-item ${
-            activePage === "captured" ? "active" : ""
-          }`}
+          className={`menu-item ${activePage === "captured" ? "active" : ""}`}
           onClick={() => navigate("captured")}
         >
           Captured
         </div>
 
         <div
-          className={`menu-item ${
-            activePage === "archive" ? "active" : ""
-          }`}
+          className={`menu-item ${activePage === "archive" ? "active" : ""}`}
           onClick={() => navigate("archive")}
         >
           Archive
         </div>
-      </div>
+      </nav>
 
-      <div
-        style={{
-          borderTop: "1px solid #ddd",
-          paddingTop: "16px",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "14px",
-            marginBottom: "6px",
-            fontWeight: "600",
-          }}
-        >
-          {user?.user_metadata?.full_name || "User"}
+      <div className="user-card">
+        <div className="user-row">
+          <div className="avatar">{initial}</div>
+          <div>
+            <div className="user-name">
+              {user?.user_metadata?.full_name || "User"}
+            </div>
+            <div className="user-email">{user?.email}</div>
+          </div>
         </div>
-
-        <div
-          style={{
-            fontSize: "12px",
-            opacity: 0.7,
-            marginBottom: "12px",
-          }}
-        >
-          {user?.email}
-        </div>
-
-        <button
-          onClick={logout}
-          style={{
-            width: "100%",
-          }}
-        >
-          Logout
+        <button className="logout-btn" onClick={logout}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Sign out
         </button>
       </div>
     </aside>
