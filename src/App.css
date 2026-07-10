@@ -1103,3 +1103,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   height: 34px;
   font-size: 13px;
 }
+/* Pencil / edit icon button — neutral grey, never red */
+.icon-btn,
+.icon-btn:hover,
+.icon-btn:focus,
+.icon-btn:active {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  transform: none !important;
+  padding: 0 !important;
+  min-height: unset !important;
+  color: var(--slate) !important;
+}
+
+.icon-btn:hover {
+  color: var(--ink) !important;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}

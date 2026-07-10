@@ -29,13 +29,13 @@ function RepeatPopover({ value, onChange }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
-        className="delete-icon"
+        className="icon-btn"
         title="Edit repeat"
         onClick={() => setOpen((o) => !o)}
         style={{
           color: value && value !== "none"
             ? "var(--sage-deep)"
-            : "var(--slate-light)",
+            : "var(--slate)",
         }}
       >
         <svg
@@ -291,6 +291,12 @@ function TaskManager({ user }) {
       return false;
     }
 
+    // Project filter — when a project is selected in the dropdown,
+    // only show tasks that belong to that project.
+    if (selectedProject && String(task.project_id) !== String(selectedProject)) {
+      return false;
+    }
+
     if (!task.scheduled_date) return true;
     if (task.repeat_type === "daily") return true;
 
@@ -324,8 +330,7 @@ function TaskManager({ user }) {
 
       {/* New task row */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 160px 150px 140px auto",
+        display: "flex",
         gap: "10px",
         marginBottom: "24px",
         alignItems: "center",
@@ -335,6 +340,7 @@ function TaskManager({ user }) {
           onChange={(e) => setTaskName(e.target.value)}
           placeholder="New task..."
           onKeyDown={(e) => e.key === "Enter" && createTask()}
+          style={{ flex: 1, minWidth: "160px" }}
         />
         <select
           value={selectedProject}
@@ -345,6 +351,25 @@ function TaskManager({ user }) {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
+
+        {/* Show a small "filtering" hint when a project is selected */}
+        {selectedProject && (
+          <button
+            onClick={() => setSelectedProject("")}
+            className="btn-ghost"
+            title="Clear project filter"
+            style={{
+              padding: "0 10px",
+              height: "34px",
+              minHeight: "unset",
+              fontSize: "12px",
+              color: "var(--sage-deep)",
+              borderColor: "var(--sage)",
+            }}
+          >
+            ✕ clear filter
+          </button>
+        )}
         <input
           type="date"
           value={scheduledDate}
@@ -364,7 +389,9 @@ function TaskManager({ user }) {
 
       {activeTasks.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px", color: "#8b938d" }}>
-          No tasks scheduled for today
+          {selectedProject
+            ? "No tasks for this project today"
+            : "No tasks scheduled for today"}
         </div>
       )}
 
@@ -442,7 +469,7 @@ function TaskManager({ user }) {
           </div>
 
           {/* Inline controls — project + pencil for repeat + delete */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
             <select
               value={task.project_id || ""}
               onChange={async (e) => {
