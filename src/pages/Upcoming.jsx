@@ -29,7 +29,7 @@ function EditPopover({ task, onSave }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
-        className="delete-icon"
+        className="icon-btn"
         title="Edit date & repeat"
         onClick={() => setOpen((o) => !o)}
         style={{ color: "var(--slate-light)" }}

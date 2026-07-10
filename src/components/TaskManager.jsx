@@ -352,22 +352,14 @@ function TaskManager({ user }) {
           ))}
         </select>
 
-        {/* Show a small "filtering" hint when a project is selected */}
         {selectedProject && (
           <button
             onClick={() => setSelectedProject("")}
-            className="btn-ghost"
+            className="delete-icon"
             title="Clear project filter"
-            style={{
-              padding: "0 10px",
-              height: "34px",
-              minHeight: "unset",
-              fontSize: "12px",
-              color: "var(--sage-deep)",
-              borderColor: "var(--sage)",
-            }}
+            style={{ fontSize: "16px", fontWeight: "700" }}
           >
-            ✕ clear filter
+            ✕
           </button>
         )}
         <input
