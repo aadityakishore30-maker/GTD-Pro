@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
-import { SelectPopover, DatePopover, RepeatPopover } from "../components/Popovers";
+import { SelectPopover, DatePopover, RepeatPopover } from "../components/Popover";
 
 function Captured({ user }) {
   const [tasks, setTasks] = useState([]);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../services/supabase";
 import ConfirmDialog from "./ConfirmDialog";
-import { SelectPopover, DatePopover, RepeatPopover } from "./Popovers";
+import { SelectPopover, DatePopover, RepeatPopover } from "./Popover";
 
 function TaskManager({ user }) {
   const [folders, setFolders] = useState([]);
