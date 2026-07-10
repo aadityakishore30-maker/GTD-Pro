@@ -5,6 +5,7 @@ import { SelectPopover, DatePopover, RepeatPopover } from "../components/Popover
 function Upcoming({ user }) {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [editingId, setEditingId] = useState(null);
 
   async function loadProjects() {
     if (!user) return;
@@ -26,8 +27,19 @@ function Upcoming({ user }) {
 
   useEffect(() => { loadProjects(); loadUpcomingTasks(); }, [user]);
 
+  async function updateTaskField(taskId, field, value) {
+    await supabase.from("tasks").update({ [field]: value }).eq("id", taskId);
+    loadUpcomingTasks();
+  }
+
   function formatDate(date) {
     return new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  function fmtShort(d) {
+    if (!d) return null;
+    const date = new Date(d + "T00:00:00");
+    return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
   }
 
   function projectsForTask(task) {
@@ -68,12 +80,13 @@ function Upcoming({ user }) {
               { value: "", label: "No project" },
               ...projectsForTask(task).map((p) => ({ value: String(p.id), label: p.name })),
             ];
+            const isEditing = editingId === task.id;
 
             return (
               <div key={task.id} className="task-row" style={{ display: "flex", alignItems: "center" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "14px", fontWeight: "600" }}>{task.title}</div>
-                  <div style={{ marginTop: "6px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ marginTop: "6px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                     {task.folders?.name && (
                       <span className="project-pill tag-folder">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -85,7 +98,10 @@ function Upcoming({ user }) {
                     {task.projects?.name && (
                       <span className="project-pill tag-project">{task.projects.name}</span>
                     )}
-                    {task.repeat_type && task.repeat_type !== "none" && (
+                    {!isEditing && task.scheduled_date && (
+                      <span style={{ fontSize: "12px", color: "#8b938d" }}>{fmtShort(task.scheduled_date)}</span>
+                    )}
+                    {!isEditing && task.repeat_type && task.repeat_type !== "none" && (
                       <span className="project-pill">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -111,33 +127,40 @@ function Upcoming({ user }) {
                   <div style={{ width: "140px" }}>
                     <SelectPopover
                       value={String(task.project_id || "")}
-                      onChange={async (val) => {
-                        await supabase.from("tasks").update({ project_id: val || null }).eq("id", task.id);
-                        loadUpcomingTasks();
-                      }}
+                      onChange={(val) => updateTaskField(task.id, "project_id", val || null)}
                       options={taskProjectOptions} placeholder="No project" size="sm"
                     />
                   </div>
-                  <div style={{ width: "120px" }}>
-                    <DatePopover
-                      value={task.scheduled_date || ""}
-                      onChange={async (val) => {
-                        await supabase.from("tasks").update({ scheduled_date: val || null }).eq("id", task.id);
-                        loadUpcomingTasks();
-                      }}
-                      placeholder="Reschedule" size="sm"
-                    />
-                  </div>
-                  <div style={{ width: "120px" }}>
-                    <RepeatPopover
-                      value={task.repeat_type || "none"}
-                      onChange={async (val) => {
-                        await supabase.from("tasks").update({ repeat_type: val }).eq("id", task.id);
-                        loadUpcomingTasks();
-                      }}
-                      size="sm"
-                    />
-                  </div>
+
+                  {isEditing ? (
+                    <>
+                      <div style={{ width: "120px" }}>
+                        <DatePopover
+                          value={task.scheduled_date || ""}
+                          onChange={(val) => updateTaskField(task.id, "scheduled_date", val || null)}
+                          size="sm"
+                        />
+                      </div>
+                      <div style={{ width: "120px" }}>
+                        <RepeatPopover
+                          value={task.repeat_type || "none"}
+                          onChange={(val) => updateTaskField(task.id, "repeat_type", val)}
+                          size="sm"
+                        />
+                      </div>
+                      <button className="delete-icon" title="Done" onClick={() => setEditingId(null)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <button className="delete-icon" title="Reschedule & repeat" onClick={() => setEditingId(task.id)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             );
