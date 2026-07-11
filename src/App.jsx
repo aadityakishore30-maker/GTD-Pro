@@ -56,9 +56,7 @@ function App() {
 
     setRescheduleTaskId(null);
     setRescheduleDate("");
-
-    // Navigate to Upcoming so the user sees the rescheduled task.
-    setCurrentPage("upcoming");
+    // Stay on Today's page — task silently moves to Upcoming in background
   }
 
   function cancelReschedule() {
