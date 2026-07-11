@@ -21,6 +21,9 @@ function App() {
   const [rescheduleTaskId, setRescheduleTaskId] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
 
+  // Bumped after a successful reschedule so Dashboard remounts and refetches
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -56,7 +59,7 @@ function App() {
 
     setRescheduleTaskId(null);
     setRescheduleDate("");
-    // Stay on Today's page — task silently moves to Upcoming in background
+    setDashboardRefreshKey((k) => k + 1); // triggers Dashboard remount/refetch
   }
 
   function cancelReschedule() {
@@ -121,7 +124,7 @@ function App() {
           </div>
         </div>
 
-        {currentPage === "dashboard" && <Dashboard user={session.user} />}
+        {currentPage === "dashboard" && <Dashboard key={dashboardRefreshKey} user={session.user} />}
         {currentPage === "upcoming" && <Upcoming user={session.user} />}
         {currentPage === "projects" && <Projects user={session.user} />}
         {currentPage === "archive" && <Archive user={session.user} />}
