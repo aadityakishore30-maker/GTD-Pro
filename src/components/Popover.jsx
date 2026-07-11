@@ -10,11 +10,22 @@ function PopoverCard({ anchorRef, onClose, children }) {
   useLayoutEffect(() => {
     if (!anchorRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + window.scrollY + 6,
-      left: rect.left + window.scrollX,
-      minWidth: rect.width,
-    });
+    const POPOVER_W = Math.max(rect.width, 220);
+    const POPOVER_H = 300; // estimated max height
+
+    // Flip left if overflows right edge of viewport
+    const overflowsRight = rect.left + POPOVER_W > window.innerWidth - 12;
+    const left = overflowsRight
+      ? rect.right + window.scrollX - POPOVER_W
+      : rect.left + window.scrollX;
+
+    // Flip upward if overflows bottom of viewport
+    const overflowsBottom = rect.bottom + POPOVER_H > window.innerHeight;
+    const top = overflowsBottom
+      ? rect.top + window.scrollY - POPOVER_H - 6
+      : rect.bottom + window.scrollY + 6;
+
+    setPos({ top, left, minWidth: rect.width });
   }, []);
 
   useEffect(() => {

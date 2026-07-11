@@ -133,6 +133,11 @@ h2 {
   flex-direction: column;
   border-right: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 200px);
+  /* Stick to viewport so footer never scrolls away */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .logo {
@@ -383,28 +388,16 @@ button {
   box-shadow: 0 2px 6px rgba(74, 124, 110, 0.3);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
 }
 
-.drag-handle {
+.delete-icon {
+  all: unset;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--slate-light);
-  cursor: grab;
-  padding: 4px 2px;
-  flex-shrink: 0;
-  opacity: 0.4;
-  transition: opacity 0.15s ease;
-}
-
-.task-row:hover .drag-handle {
-  opacity: 1;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
+  color: #fca5a5;
 }
 
 button:hover {
@@ -533,6 +526,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .task-row:hover {
   background: var(--paper);
+  border-color: #d7d2c4;
   transform: none;
 }
 
@@ -751,24 +745,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* ---------- PROJECTS ---------- */
 
-.project-folder-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-
-.project-folder-group-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--slate-light);
-  margin-bottom: 12px;
-}
-
 .project-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -778,6 +754,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .project-card {
   background: var(--paper);
   border: 1px solid var(--line);
+  border-left: 4px solid var(--sage);
   border-radius: 12px;
   padding: 18px 18px 16px;
   cursor: pointer;
@@ -831,6 +808,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--slate-light);
   margin-top: 7px;
   font-weight: 500;
+}
+
+.project-card .del {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: var(--slate-light);
+}
+
+.project-card:hover .del {
+  opacity: 1;
+}
+
+.project-card .del:hover {
+  color: var(--coral);
 }
 
 .project-detail {
@@ -1004,27 +998,81 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .project-pill svg {
   flex-shrink: 0;
 }
-
-.captured-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+/* ── Button centering fix ── */
+button {
+  justify-content: center;
 }
 
+/* ── Drag handle ── */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--slate-light);
+  cursor: grab;
+  padding: 4px 2px;
+  flex-shrink: 0;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+.task-row:hover .drag-handle { opacity: 1; }
+.drag-handle:active { cursor: grabbing; }
+
+/* ── Remove task row hover shadow ── */
+.task-row:hover {
+  background: var(--paper);
+  transform: none;
+  border-color: var(--line);
+}
+
+/* ── icon-btn (pencil/edit) — neutral grey, never red ── */
+.icon-btn,
+.icon-btn:hover,
+.icon-btn:focus,
+.icon-btn:active {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  transform: none !important;
+  padding: 0 !important;
+  min-height: unset !important;
+}
+.icon-btn { color: var(--slate) !important; }
+.icon-btn:hover { color: var(--ink) !important; }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* ── Project folder groups ── */
+.project-folder-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.project-folder-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--slate-light);
+  margin-bottom: 12px;
+}
+
+/* ── Captured page ── */
+.captured-list { display: flex; flex-direction: column; gap: 14px; }
 .captured-row {
   background: var(--paper-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 16px 18px;
 }
-
 .captured-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
 }
-
 .captured-title-input {
   flex: 1;
   font-weight: 600;
@@ -1037,13 +1085,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin: -4px -6px;
   font-family: inherit;
 }
-
 .captured-title-input:hover,
 .captured-title-input:focus {
   border-color: var(--line);
   background: var(--paper);
 }
-
 .captured-notes-input {
   margin-top: 10px;
   width: 100%;
@@ -1057,7 +1103,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   padding: 10px 12px;
   resize: vertical;
 }
-
 .captured-source {
   display: inline-flex;
   align-items: center;
@@ -1070,26 +1115,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-radius: 999px;
   padding: 3px 10px;
 }
-
-.captured-source a {
-  color: var(--sage-deep);
-  text-decoration: underline;
-}
-
-.captured-notes {
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--slate);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  max-height: 110px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-}
-
+.captured-source a { color: var(--sage-deep); text-decoration: underline; }
 .captured-fields {
   display: flex;
   flex-wrap: wrap;
@@ -1098,30 +1124,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin-top: 14px;
 }
 
-.captured-fields select,
-.captured-fields input[type="date"] {
-  height: 34px;
-  font-size: 13px;
+/* ── Archive ── */
+.archive-list { display: flex; flex-direction: column; gap: 8px; }
+.archive-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 11px;
+  background: var(--paper);
+  border: 1px solid var(--line);
 }
-/* Pencil / edit icon button — neutral grey, never red */
-.icon-btn,
-.icon-btn:hover,
-.icon-btn:focus,
-.icon-btn:active {
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-  transform: none !important;
-  padding: 0 !important;
-  min-height: unset !important;
-  color: var(--slate) !important;
+.archive-title {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: #c9c5b8;
 }
-
-.icon-btn:hover {
-  color: var(--ink) !important;
-}
-
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
-}
+.archive-meta { font-size: 12px; color: var(--slate-light); margin-top: 4px; }
+.archive-row .btn-ghost { border-color: var(--sage); color: var(--sage-deep); }
+.archive-row .btn-ghost:hover { background: var(--sage); color: #fff; border-color: var(--sage); }
