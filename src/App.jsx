@@ -85,7 +85,7 @@ function App() {
           </div>
         </div>
 
-        {currentPage === "dashboard" && <Dashboard user={session.user} />}
+        {currentPage === "dashboard" && <Dashboard user={session.user} onReschedule={handleDragToUpcoming} />}
         {currentPage === "upcoming" && <Upcoming user={session.user} />}
         {currentPage === "projects" && <Projects user={session.user} />}
         {currentPage === "archive" && <Archive user={session.user} />}
