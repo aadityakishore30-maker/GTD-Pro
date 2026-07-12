@@ -91,7 +91,9 @@ function TaskManager({ user }) {
     setTimeout(() => setDraggingIndex(index), 0);
   }
 
-  function handleDragEnter(index) { setDragOverIndex(index); }
+  function handleDragEnter(index) {
+    setDragOverIndex((prev) => (prev === index ? prev : index));
+  }
 
   function handleDrop(dropIndex) {
     const from = dragIndex.current;
@@ -239,7 +241,6 @@ function TaskManager({ user }) {
             opacity: draggingIndex === index ? 0.4 : 1,
             borderTop: dragOverIndex === index && draggingIndex !== index
               ? "2px solid var(--sage)" : "2px solid transparent",
-            transition: "border-color 0.1s ease, opacity 0.1s ease",
           }}
         >
           {/* Drag handle — dragging only ever starts from here now */}
