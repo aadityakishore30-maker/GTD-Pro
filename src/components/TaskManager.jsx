@@ -80,9 +80,15 @@ function TaskManager({ user }) {
 
   function handleDragStart(e, index, task) {
     dragIndex.current = index;
-    setDraggingIndex(index);
     e.dataTransfer.setData("taskId", String(task.id));
     e.dataTransfer.effectAllowed = "move";
+    // Do NOT call setDraggingIndex synchronously here. Triggering a React
+    // re-render (which changes this row's opacity) in the same tick as
+    // dragstart can interrupt the browser's native drag-image capture.
+    // On Chromium this is a known way to get stuck in a phantom drag
+    // session — cursor pinned to "grabbing", input swallowed, requiring
+    // a hard refresh to recover. Deferring to the next tick avoids it.
+    setTimeout(() => setDraggingIndex(index), 0);
   }
 
   function handleDragEnter(index) { setDragOverIndex(index); }
