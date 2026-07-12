@@ -3,7 +3,7 @@ import { supabase } from "../services/supabase";
 import ConfirmDialog from "./ConfirmDialog";
 import { SelectPopover, RepeatPopover, PencilPopover } from "./Popover";
 
-function TaskManager({ user, onReschedule }) {
+function TaskManager({ user }) {
   const [folders, setFolders] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -87,19 +87,40 @@ function TaskManager({ user, onReschedule }) {
 
   function handleDragEnter(index) { setDragOverIndex(index); }
 
-  async function handleDrop(dropIndex) {
+  function handleDrop(dropIndex) {
     const from = dragIndex.current;
-    if (from === null || from === dropIndex) {
-      dragIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); return;
-    }
+    // Always clear drag state immediately and synchronously — never wait on
+    // a network call to do this, or the row sits dimmed/unresponsive until
+    // the request resolves (or forever, if it silently fails).
+    dragIndex.current = null;
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+
+    if (from === null || from === dropIndex) return;
+
     const reordered = [...activeTasks];
     const [moved] = reordered.splice(from, 1);
     reordered.splice(dropIndex, 0, moved);
-    await Promise.all(reordered.map((task, idx) =>
-      supabase.from("tasks").update({ sort_order: idx }).eq("id", task.id)
-    ));
-    dragIndex.current = null; setDraggingIndex(null); setDragOverIndex(null);
-    loadTasks(selectedFolder);
+
+    // Optimistic UI: reflect the new order right away instead of waiting
+    // on Supabase, then persist in the background.
+    setTasks((prev) => {
+      const reorderedIds = reordered.map((t) => t.id);
+      const rest = prev.filter((t) => !reorderedIds.includes(t.id));
+      const reorderedWithSort = reordered.map((t, idx) => ({ ...t, sort_order: idx }));
+      return [...reorderedWithSort, ...rest];
+    });
+
+    Promise.all(
+      reordered.map((task, idx) =>
+        supabase.from("tasks").update({ sort_order: idx }).eq("id", task.id)
+      )
+    )
+      .then(() => loadTasks(selectedFolder))
+      .catch((err) => {
+        console.error("Failed to save reorder:", err);
+        loadTasks(selectedFolder); // resync with server truth on failure
+      });
   }
 
   function handleDragEnd() {
@@ -107,6 +128,24 @@ function TaskManager({ user, onReschedule }) {
     setDraggingIndex(null);
     setDragOverIndex(null);
   }
+
+  // Safety net: if a drop happens somewhere the row's own handlers don't
+  // cover (e.g. the browser cancels the drag, or focus/DOM changes mid-drag
+  // suppress the row's dragend), this guarantees the dimmed/dragging state
+  // never gets stuck indefinitely.
+  useEffect(() => {
+    function clearDragState() {
+      dragIndex.current = null;
+      setDraggingIndex(null);
+      setDragOverIndex(null);
+    }
+    window.addEventListener("dragend", clearDragState);
+    window.addEventListener("drop", clearDragState);
+    return () => {
+      window.removeEventListener("dragend", clearDragState);
+      window.removeEventListener("drop", clearDragState);
+    };
+  }, []);
 
   useEffect(() => { loadFolders(); loadProjects(); }, [user]);
   useEffect(() => {
@@ -279,25 +318,6 @@ function TaskManager({ user, onReschedule }) {
               )}
             </PencilPopover>
             </div>
-
-            {/* Reschedule to Upcoming — explicit alternative to drag/drop,
-                since native HTML5 drag-and-drop doesn't work on touch devices
-                and the desktop sidebar drop target is hidden on mobile */}
-            <button
-              className="icon-btn"
-              draggable={false}
-              title="Move to Upcoming"
-              onClick={() => onReschedule?.(task.id)}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-                <path d="M12 14l3 3-3 3" />
-                <path d="M9 17h6" />
-              </svg>
-            </button>
 
             <button className="delete-icon" draggable={false} title="Delete task" onClick={() => setTaskPendingDelete(task)}>
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
