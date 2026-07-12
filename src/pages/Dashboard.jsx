@@ -10,30 +10,15 @@ function Dashboard({ user }) {
   const [pendingOrganize, setPendingOrganize] = useState(0);
   const [percentDone, setPercentDone] = useState(0);
 
-  // Same recurrence-aware "is this task relevant today" check used
-  // in TaskManager.jsx, kept in sync so both views agree on what
-  // counts as a today's task.
   function isTaskForToday(task, todayStr) {
-    if (!task.scheduled_date) {
-      return true;
-    }
-
-    if (task.repeat_type === "daily") {
-      return true;
-    }
-
+    if (!task.scheduled_date) return true;
+    if (task.repeat_type === "daily") return true;
     if (task.repeat_type === "weekly") {
-      const todayDay = new Date().getDay();
-      const taskDay = new Date(task.scheduled_date).getDay();
-      return todayDay === taskDay;
+      return new Date().getDay() === new Date(task.scheduled_date).getDay();
     }
-
     if (task.repeat_type === "monthly") {
-      const todayDate = new Date().getDate();
-      const taskDate = new Date(task.scheduled_date).getDate();
-      return todayDate === taskDate;
+      return new Date().getDate() === new Date(task.scheduled_date).getDate();
     }
-
     return task.scheduled_date === todayStr;
   }
 
@@ -42,134 +27,61 @@ function Dashboard({ user }) {
 
     const now = new Date();
     const today =
-      now.getFullYear() +
-      "-" +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      "-" +
+      now.getFullYear() + "-" +
+      String(now.getMonth() + 1).padStart(2, "0") + "-" +
       String(now.getDate()).padStart(2, "0");
 
     const { data: allTasks, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("user_id", user.id)
+      .from("tasks").select("*").eq("user_id", user.id)
       .not("folder_id", "is", null);
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
+    if (error) { console.error(error); return; }
     const tasks = allTasks || [];
 
-    // Card 1: total today's tasks across every folder/project,
-    // including ones already completed.
-    const todaysTasks = tasks.filter((task) =>
-      isTaskForToday(task, today)
-    );
+    const todaysTasks = tasks.filter((t) => isTaskForToday(t, today));
     setTotalToday(todaysTasks.length);
 
-    // Card 2: upcoming tasks, matching the same definition
-    // Upcoming.jsx uses (strictly after today, not completed).
-    const upcoming = tasks.filter(
-      (task) =>
-        task.scheduled_date &&
-        task.scheduled_date > today &&
-        task.status?.toLowerCase() !== "completed"
+    const upcoming = tasks.filter((t) =>
+      t.scheduled_date && t.scheduled_date > today && t.status?.toLowerCase() !== "completed"
     );
     setUpcomingCount(upcoming.length);
 
-    // Card 3: today's tasks that are completed. Repeating tasks
-    // are "completed" for today specifically via last_completed_date;
-    // one-time tasks use the permanent status field.
-    const completed = todaysTasks.filter((task) => {
-      const isRepeating =
-        task.repeat_type && task.repeat_type !== "none";
-
-      if (isRepeating) {
-        return task.last_completed_date === today;
-      }
-
-      return task.status?.toLowerCase() === "completed";
-    });
+    const completed = todaysTasks.filter((t) => t.status?.toLowerCase() === "completed");
     setCompletedToday(completed.length);
 
-    // Card 4: items captured from Gmail/Chat that haven't been
-    // organized yet (no folder assigned). Queried separately
-    // since the main task list above deliberately excludes them.
-    const { count: pendingCount, error: pendingError } = await supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .is("folder_id", null);
+    setPercentDone(todaysTasks.length > 0
+      ? Math.round((completed.length / todaysTasks.length) * 100) : 0);
 
-    if (pendingError) {
-      console.error(pendingError);
-    } else {
-      setPendingOrganize(pendingCount || 0);
-    }
-
-    // Card 5: percentage of today's scheduled tasks completed.
-    const percent =
-      todaysTasks.length > 0
-        ? Math.round(
-            (completed.length / todaysTasks.length) * 100
-          )
-        : 0;
-    setPercentDone(percent);
+    const { count } = await supabase
+      .from("tasks").select("id", { count: "exact", head: true })
+      .eq("user_id", user.id).is("folder_id", null);
+    setPendingOrganize(count || 0);
   }
 
-  useEffect(() => {
-    loadSummary();
-  }, [user]);
+  useEffect(() => { loadSummary(); }, [user]);
+
+  const cards = [
+    { label: "Today's Tasks", value: totalToday },
+    { label: "Upcoming", value: upcomingCount },
+    { label: "Completed Today", value: completedToday },
+    { label: "Pending to Organize", value: pendingOrganize },
+    { label: "% Done Today", value: `${percentDone}%` },
+  ];
 
   return (
     <div>
-      {/* Summary Cards */}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-          gap: "18px",
-          marginBottom: "28px",
-        }}
-      >
-        <div className="card summary-card">
-          <div className="summary-label">Today's Tasks</div>
-          <div className="summary-number">{totalToday}</div>
-        </div>
-
-        <div className="card summary-card">
-          <div className="summary-label">Upcoming</div>
-          <div className="summary-number">{upcomingCount}</div>
-        </div>
-
-        <div className="card summary-card">
-          <div className="summary-label">Completed Today</div>
-          <div className="summary-number">{completedToday}</div>
-        </div>
-
-        <div className="card summary-card">
-          <div className="summary-label">Pending to Organize</div>
-          <div className="summary-number">{pendingOrganize}</div>
-        </div>
-
-        <div className="card summary-card">
-          <div className="summary-label">% Done Today</div>
-          <div className="summary-number">{percentDone}%</div>
-        </div>
+      {/* Summary cards — 5 cols desktop, 2 cols mobile */}
+      <div className="summary-grid" style={{ marginBottom: "28px" }}>
+        {cards.map((c) => (
+          <div key={c.label} className="card summary-card">
+            <div className="summary-label">{c.label}</div>
+            <div className="summary-number">{c.value}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Main Content */}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px 1fr",
-          gap: "24px",
-          alignItems: "start",
-        }}
-      >
+      {/* Main content — 2 cols desktop, 1 col mobile */}
+      <div className="dashboard-grid">
         <FolderManager user={user} />
         <TaskManager user={user} />
       </div>

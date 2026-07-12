@@ -138,7 +138,7 @@ function TaskManager({ user }) {
       </div>
 
       {/* ── New task row ── */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "24px", alignItems: "center" }}>
+      <div className="task-create-row" style={{ display: "flex", gap: "10px", marginBottom: "24px", alignItems: "center" }}>
         <input
           value={taskName} onChange={(e) => setTaskName(e.target.value)}
           placeholder="New task..." onKeyDown={(e) => e.key === "Enter" && createTask()}
@@ -223,7 +223,7 @@ function TaskManager({ user }) {
           </div>
 
           {/* Controls: project + pencil for repeat + delete */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+          <div className="task-row-controls" style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
             <div style={{ width: "140px" }}>
               <SelectPopover
                 value={String(task.project_id || "")}
