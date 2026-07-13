@@ -67,6 +67,7 @@ const NAV_ITEMS = [
 function Sidebar({ setCurrentPage, user, onDragToUpcoming }) {
   const [activePage, setActivePage] = useState("dashboard");
   const [upcomingDragOver, setUpcomingDragOver] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function navigate(page) {
     setActivePage(page);
@@ -96,6 +97,36 @@ function Sidebar({ setCurrentPage, user, onDragToUpcoming }) {
 
   return (
     <>
+      {/* ── Mobile top-right profile/logout ─────────────────── */}
+      <div className="mobile-topbar">
+        <button className="mobile-avatar-btn" onClick={() => setMobileMenuOpen((o) => !o)}>
+          {initial}
+        </button>
+        {mobileMenuOpen && (
+          <>
+            <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
+            <div className="mobile-user-dropdown">
+              <div className="user-row" style={{ padding: "0 0 12px 0" }}>
+                <div className="avatar">{initial}</div>
+                <div>
+                  <div className="user-name">{user?.user_metadata?.full_name || "User"}</div>
+                  <div className="user-email">{user?.email}</div>
+                </div>
+              </div>
+              <button className="logout-btn" onClick={logout}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* ── Desktop sidebar ─────────────────────────────────── */}
       <aside className="sidebar">
         <div className="logo">

@@ -178,6 +178,7 @@ function Projects({ user }) {
       </h2>
 
       <div
+        className="project-create-row"
         style={{
           display: "flex",
           gap: "12px",

@@ -1247,3 +1247,63 @@ button { justify-content: center; }
     min-width: 0 !important;
   }
 }
+
+/* ── Mobile top-right profile menu ── */
+.mobile-topbar { display: none; }
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: block;
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 150;
+  }
+  .mobile-avatar-btn {
+    all: unset;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(140deg, var(--lavender), #9999d6);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(28,33,40,0.15);
+  }
+  .mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 149;
+  }
+  .mobile-user-dropdown {
+    position: absolute;
+    top: 46px;
+    right: 0;
+    z-index: 151;
+    width: 230px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(28,33,40,0.16);
+    padding: 14px;
+  }
+
+  /* ── Projects page — create row stacks like task-create-row ── */
+  .project-create-row {
+    flex-wrap: wrap !important;
+  }
+  .project-create-row input {
+    width: 100% !important;
+    flex: none !important;
+  }
+  .project-create-row select {
+    width: 100% !important;
+    flex: none !important;
+  }
+  .project-create-row button {
+    width: 100% !important;
+  }
+}
