@@ -327,7 +327,7 @@ function TaskManager({ user, onReschedule }) {
             </div>
 
             <button
-              className="icon-btn"
+              className="icon-btn reschedule-btn"
               draggable={false}
               title="Reschedule to Upcoming"
               onClick={() => onReschedule?.(task.id)}

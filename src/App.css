@@ -1250,14 +1250,18 @@ button { justify-content: center; }
 
 /* ── Mobile top-right profile menu ── */
 .mobile-topbar { display: none; }
+/* Reschedule icon: mobile-only fallback for tasks that can't be
+   dragged on touch. Desktop keeps drag-and-drop only. */
+.reschedule-btn { display: none; }
 @media (max-width: 768px) {
   .mobile-topbar {
     display: block;
-    position: fixed;
-    top: 16px;
+    position: absolute; /* scrolls with the page, not pinned to viewport */
+    top: 20px;
     right: 16px;
     z-index: 150;
   }
+  .reschedule-btn { display: inline-flex !important; }
   .mobile-avatar-btn {
     all: unset;
     width: 38px;

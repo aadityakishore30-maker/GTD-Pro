@@ -10,16 +10,44 @@ function Dashboard({ user, onReschedule }) {
   const [pendingOrganize, setPendingOrganize] = useState(0);
   const [percentDone, setPercentDone] = useState(0);
 
+  function localDateStr(d) {
+    const dt = new Date(d);
+    return dt.getFullYear() + "-" +
+      String(dt.getMonth() + 1).padStart(2, "0") + "-" +
+      String(dt.getDate()).padStart(2, "0");
+  }
+
   function isTaskForToday(task, todayStr) {
-    if (!task.scheduled_date) return true;
-    if (task.repeat_type === "daily") return true;
-    if (task.repeat_type === "weekly") {
-      return new Date().getDay() === new Date(task.scheduled_date).getDay();
+    const isRepeating = task.repeat_type && task.repeat_type !== "none";
+    if (isRepeating) {
+      if (task.repeat_type === "daily") return true;
+      if (task.repeat_type === "weekly") {
+        return new Date().getDay() === new Date(task.scheduled_date).getDay();
+      }
+      if (task.repeat_type === "monthly") {
+        return new Date().getDate() === new Date(task.scheduled_date).getDate();
+      }
+      return true;
     }
-    if (task.repeat_type === "monthly") {
-      return new Date().getDate() === new Date(task.scheduled_date).getDate();
+    if (!task.scheduled_date) {
+      // No-date backlog task: it belongs to "today" only while still open,
+      // or on the specific day it got completed — not forever after.
+      if (task.status?.toLowerCase() === "completed") {
+        return !!task.completed_at && localDateStr(task.completed_at) === todayStr;
+      }
+      return true;
     }
     return task.scheduled_date === todayStr;
+  }
+
+  function isCompletedToday(task, todayStr) {
+    const isRepeating = task.repeat_type && task.repeat_type !== "none";
+    if (isRepeating) return task.last_completed_date === todayStr;
+    return (
+      task.status?.toLowerCase() === "completed" &&
+      !!task.completed_at &&
+      localDateStr(task.completed_at) === todayStr
+    );
   }
 
   async function loadSummary() {
@@ -46,7 +74,7 @@ function Dashboard({ user, onReschedule }) {
     );
     setUpcomingCount(upcoming.length);
 
-    const completed = todaysTasks.filter((t) => t.status?.toLowerCase() === "completed");
+    const completed = todaysTasks.filter((t) => isCompletedToday(t, today));
     setCompletedToday(completed.length);
 
     setPercentDone(todaysTasks.length > 0
