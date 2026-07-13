@@ -3,7 +3,7 @@ import { supabase } from "../services/supabase";
 import ConfirmDialog from "./ConfirmDialog";
 import { SelectPopover, RepeatPopover, PencilPopover } from "./Popover";
 
-function TaskManager({ user, onReschedule }) {
+function TaskManager({ user, onReschedule, refreshTrigger }) {
   const [folders, setFolders] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -158,7 +158,7 @@ function TaskManager({ user, onReschedule }) {
   useEffect(() => { loadFolders(); loadProjects(); }, [user]);
   useEffect(() => {
     if (selectedFolder) { localStorage.setItem("selectedFolder", selectedFolder); loadTasks(selectedFolder); }
-  }, [selectedFolder]);
+  }, [selectedFolder, refreshTrigger]);
 
   const now = new Date();
   const today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");

@@ -3,7 +3,7 @@ import { supabase } from "../services/supabase";
 import FolderManager from "../components/FolderManager";
 import TaskManager from "../components/TaskManager";
 
-function Dashboard({ user, onReschedule }) {
+function Dashboard({ user, onReschedule, refreshTrigger }) {
   const [totalToday, setTotalToday] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
@@ -86,7 +86,7 @@ function Dashboard({ user, onReschedule }) {
     setPendingOrganize(count || 0);
   }
 
-  useEffect(() => { loadSummary(); }, [user]);
+  useEffect(() => { loadSummary(); }, [user, refreshTrigger]);
 
   const cards = [
     { label: "Today's Tasks", value: totalToday },
@@ -111,7 +111,7 @@ function Dashboard({ user, onReschedule }) {
       {/* Main content — 2 cols desktop, 1 col mobile */}
       <div className="dashboard-grid">
         <FolderManager user={user} />
-        <TaskManager user={user} onReschedule={onReschedule} />
+        <TaskManager user={user} onReschedule={onReschedule} refreshTrigger={refreshTrigger} />
       </div>
     </div>
   );

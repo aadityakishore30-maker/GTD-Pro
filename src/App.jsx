@@ -15,6 +15,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [rescheduleTaskId, setRescheduleTaskId] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -36,9 +37,11 @@ function App() {
 
   async function confirmReschedule() {
     if (!rescheduleDate || !rescheduleTaskId) return;
-    await supabase.from("tasks").update({ scheduled_date: rescheduleDate }).eq("id", rescheduleTaskId);
+    const { error } = await supabase.from("tasks").update({ scheduled_date: rescheduleDate }).eq("id", rescheduleTaskId);
+    if (error) { alert(error.message); return; }
     setRescheduleTaskId(null);
     setRescheduleDate("");
+    setRefreshTrigger((n) => n + 1); // tell Dashboard/TaskManager to re-fetch
     // Stay on Today's page
   }
 
@@ -85,7 +88,7 @@ function App() {
           </div>
         </div>
 
-        {currentPage === "dashboard" && <Dashboard user={session.user} onReschedule={handleDragToUpcoming} />}
+        {currentPage === "dashboard" && <Dashboard user={session.user} onReschedule={handleDragToUpcoming} refreshTrigger={refreshTrigger} />}
         {currentPage === "upcoming" && <Upcoming user={session.user} />}
         {currentPage === "projects" && <Projects user={session.user} />}
         {currentPage === "archive" && <Archive user={session.user} />}
