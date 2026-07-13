@@ -5,13 +5,17 @@ import { createPortal } from "react-dom";
 // this prevents it being clipped by any parent overflow or z-index.
 function PopoverCard({ anchorRef, onClose, children }) {
   const [pos, setPos] = useState(null);
+  const [ready, setReady] = useState(false);
   const boxRef = useRef(null);
 
   useLayoutEffect(() => {
-    if (!anchorRef.current) return;
+    if (!anchorRef.current || !boxRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
-    const POPOVER_W = Math.max(rect.width, 220);
-    const POPOVER_H = 300; // estimated max height
+    // Measure the box's real rendered size (not a guessed width) so the
+    // flipped position lines up exactly against the trigger, with no gap.
+    const boxRect = boxRef.current.getBoundingClientRect();
+    const POPOVER_W = boxRect.width;
+    const POPOVER_H = boxRect.height;
 
     // Flip left if overflows right edge of viewport
     const overflowsRight = rect.left + POPOVER_W > window.innerWidth - 12;
@@ -26,6 +30,7 @@ function PopoverCard({ anchorRef, onClose, children }) {
       : rect.bottom + window.scrollY + 6;
 
     setPos({ top, left, minWidth: rect.width });
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -41,16 +46,18 @@ function PopoverCard({ anchorRef, onClose, children }) {
     return () => document.removeEventListener("mousedown", handle);
   }, []);
 
-  if (!pos) return null;
-
   return createPortal(
     <div
       ref={boxRef}
       style={{
         position: "absolute",
-        top: pos.top,
-        left: pos.left,
-        minWidth: pos.minWidth,
+        // First frame renders off-screen (unmeasured) so we can read its
+        // real size, then we snap it into the correct spot and reveal it —
+        // this avoids any visible flash while still being pixel-accurate.
+        top: pos ? pos.top : -9999,
+        left: pos ? pos.left : -9999,
+        visibility: ready ? "visible" : "hidden",
+        minWidth: pos ? pos.minWidth : undefined,
         background: "var(--paper-raised)",
         border: "1px solid var(--line)",
         borderRadius: "12px",
@@ -73,6 +80,7 @@ function TriggerBtn({ label, hasValue, size = "md", onClick }) {
 
   return (
     <button
+      className="popover-trigger-btn"
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
@@ -113,6 +121,7 @@ function OptionRow({ label, selected, onClick }) {
   const [hov, setHov] = useState(false);
   return (
     <div
+      className="popover-option-row"
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}

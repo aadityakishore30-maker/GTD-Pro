@@ -1044,6 +1044,7 @@ button { justify-content: center; }
 /* Topbar classes */
 .page-title { margin: 0; font-size: 34px; font-weight: 700; line-height: 1.1; color: #1c2128; }
 .page-subtitle { margin-top: 10px; font-size: 16px; color: #9aa1ac; }
+.task-row-title { font-size: 14px; font-weight: 600; }
 .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
 .topbar-clock { text-align: right; }
 .clock-date { font-size: 18px; font-weight: 700; color: #6b7280; }
@@ -1113,10 +1114,21 @@ button { justify-content: center; }
   /* Topbar — stack vertically on mobile */
   .topbar { flex-direction: column; gap: 4px; margin-bottom: 20px; }
   .topbar-clock { text-align: left; }
-  .page-title { font-size: 24px; }
-  .page-subtitle { font-size: 13px; margin-top: 4px; }
+
+  /* ── Typography hierarchy, consistent across every mobile page ── */
+  .page-title { font-size: 28px; font-weight: 800; } /* headline: bigger */
+  .page-subtitle { font-size: 12px; margin-top: 4px; } /* sub-headline: smaller */
+  .card h2 { font-size: 17px; } /* section headline, e.g. "Today's Tasks" */
   .clock-date { font-size: 13px; font-weight: 600; }
   .clock-time { font-size: 12px; margin-top: 2px; }
+
+  /* Body copy: bigger, consistent everywhere */
+  .task-row-title { font-size: 15px; }
+  .project-name { font-size: 15.5px; }
+  .project-stats { font-size: 12.5px; }
+  .project-folder { font-size: 12px; }
+  .summary-number { font-size: 24px !important; }
+  .summary-label { font-size: 10.5px !important; }
 
   /* Summary cards — 2 per row on mobile */
   .summary-grid {
@@ -1203,6 +1215,29 @@ button { justify-content: center; }
 
   /* Upcoming — no horizontal overflow, task rows full width */
   .task-row { overflow: visible; }
+
+  /* ── Every dropdown trigger — same height, padding, and text size ── */
+  .popover-trigger-btn {
+    height: 42px !important;
+    font-size: 14px !important;
+    padding: 0 12px !important;
+  }
+  .popover-option-row {
+    padding: 12px 14px !important;
+    font-size: 14px !important;
+  }
+
+  /* ── Icon buttons — equal, comfortable tap targets, equal spacing ── */
+  .task-row-controls, .project-card > div:first-child {
+    gap: 8px !important;
+  }
+  .icon-btn, .delete-icon {
+    min-width: 32px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* ============================================================
