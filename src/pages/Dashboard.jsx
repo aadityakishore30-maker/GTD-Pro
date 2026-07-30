@@ -30,8 +30,6 @@ function Dashboard({ user, onReschedule, refreshTrigger }) {
       return true;
     }
     if (!task.scheduled_date) {
-      // No-date backlog task: it belongs to "today" only while still open,
-      // or on the specific day it got completed — not forever after.
       if (task.status?.toLowerCase() === "completed") {
         return !!task.completed_at && localDateStr(task.completed_at) === todayStr;
       }
@@ -98,7 +96,6 @@ function Dashboard({ user, onReschedule, refreshTrigger }) {
 
   return (
     <div>
-      {/* Summary cards — 5 cols desktop, 2 cols mobile */}
       <div className="summary-grid" style={{ marginBottom: "28px" }}>
         {cards.map((c) => (
           <div key={c.label} className="card summary-card">
@@ -108,9 +105,11 @@ function Dashboard({ user, onReschedule, refreshTrigger }) {
         ))}
       </div>
 
-      {/* Main content — 2 cols desktop, 1 col mobile */}
       <div className="dashboard-grid">
-        <FolderManager user={user} />
+        {/* Sticky folder panel — sticks to top as tasks scroll */}
+        <div style={{ position: "sticky", top: "20px", alignSelf: "start" }}>
+          <FolderManager user={user} />
+        </div>
         <TaskManager user={user} onReschedule={onReschedule} refreshTrigger={refreshTrigger} />
       </div>
     </div>
