@@ -1,128 +1,166 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./services/supabase";
+
 import Login from "./components/Login";
 import Sidebar from "./components/Sidebar";
+
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Upcoming from "./pages/Upcoming";
 import Archive from "./pages/Archive";
-import Captured from "./pages/Captured";
+
 import "./App.css";
 
 function App() {
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [rescheduleTaskId, setRescheduleTaskId] = useState(null);
-  const [rescheduleDate, setRescheduleDate] = useState("");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setSession(session));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
     return () => clearInterval(timer);
   }, []);
 
-  if (!session) return <Login />;
-
-  function handleDragToUpcoming(taskId) {
-    setRescheduleTaskId(taskId);
-    setRescheduleDate("");
+  if (!session) {
+    return <Login />;
   }
 
-  async function confirmReschedule() {
-    if (!rescheduleDate || !rescheduleTaskId) return;
-    const { error } = await supabase.from("tasks").update({ scheduled_date: rescheduleDate }).eq("id", rescheduleTaskId);
-    if (error) { alert(error.message); return; }
-    setRescheduleTaskId(null);
-    setRescheduleDate("");
-    setRefreshTrigger((n) => n + 1); // tell Dashboard/TaskManager to re-fetch
-    // Stay on Today's page
+  function getPageTitle() {
+    switch (currentPage) {
+      case "dashboard":
+        return "Today";
+
+      case "upcoming":
+        return "Upcoming";
+
+      case "projects":
+        return "Projects";
+
+      case "archive":
+        return "Archive";
+
+      default:
+        return "Captur";
+    }
   }
 
-  function cancelReschedule() { setRescheduleTaskId(null); setRescheduleDate(""); }
+  function getPageSubtitle() {
+    switch (currentPage) {
+      case "dashboard":
+        return "Clear what matters, leave the rest for later.";
 
-  const PAGE_TITLES = {
-    dashboard: "Today",
-    upcoming: "Upcoming",
-    projects: "Projects",
-    archive: "Archive",
-    captured: "Captured",
-  };
-  const PAGE_SUBS = {
-    dashboard: "Clear what matters, leave the rest for later.",
-    upcoming: "A gentle view of what's ahead.",
-    projects: "Track progress across meaningful outcomes.",
-    archive: "Completed work, safely stored away.",
-    captured: "Newly arrived, waiting to be sorted.",
-  };
+      case "upcoming":
+        return "A gentle view of what's ahead.";
+
+      case "projects":
+        return "Track progress across meaningful outcomes.";
+
+      case "archive":
+        return "Completed work, safely stored away.";
+
+      default:
+        return "";
+    }
+  }
 
   return (
     <div className="app">
-      <Sidebar
-        setCurrentPage={setCurrentPage}
-        user={session.user}
-        onDragToUpcoming={handleDragToUpcoming}
-      />
+      <Sidebar setCurrentPage={setCurrentPage} />
 
       <main className="main">
-        <div className="topbar">
+        <div
+          className="topbar"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "32px",
+          }}
+        >
           <div>
-            <h1 className="page-title">{PAGE_TITLES[currentPage] || "Captur"}</h1>
-            <div className="page-subtitle">{PAGE_SUBS[currentPage] || ""}</div>
+            <h1
+  style={{
+    margin: 0,
+    fontSize: "34px",
+    fontWeight: "700",
+    lineHeight: 1.1,
+    color: "#1c2128",
+  }}
+>
+  {getPageTitle()}
+</h1>
+
+            <div
+              style={{
+                marginTop: "10px",
+                fontSize: "16px",
+                color: "#9aa1ac",
+              }}
+            >
+              {getPageSubtitle()}
+            </div>
           </div>
-          <div className="topbar-clock">
-            <div className="clock-date">
+
+          <div
+            style={{
+              textAlign: "right",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: "700",
+                color: "#6b7280",
+              }}
+            >
               {currentTime.toLocaleDateString("en-US", {
-                weekday: "long", month: "long", day: "numeric", year: "numeric",
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
               })}
             </div>
-            <div className="clock-time">
-              {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+
+            <div
+              style={{
+                marginTop: "6px",
+                fontSize: "14px",
+                color: "#9aa1ac",
+              }}
+            >
+              {currentTime.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </div>
           </div>
         </div>
 
-        {currentPage === "dashboard" && <Dashboard user={session.user} onReschedule={handleDragToUpcoming} refreshTrigger={refreshTrigger} />}
-        {currentPage === "upcoming" && <Upcoming user={session.user} />}
-        {currentPage === "projects" && <Projects user={session.user} />}
-        {currentPage === "archive" && <Archive user={session.user} />}
-        {currentPage === "captured" && <Captured user={session.user} />}
+        {currentPage === "dashboard" && <Dashboard />}
+
+        {currentPage === "upcoming" && <Upcoming />}
+
+        {currentPage === "projects" && <Projects />}
+
+        {currentPage === "archive" && <Archive />}
       </main>
-
-      {/* Drag-to-Upcoming reschedule modal */}
-      {rescheduleTaskId && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200,
-          display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div onClick={cancelReschedule}
-            style={{ position: "absolute", inset: 0, background: "rgba(28,33,40,0.18)" }} />
-          <div style={{
-            position: "relative", zIndex: 201,
-            background: "var(--paper-raised)", border: "1px solid var(--line)",
-            borderRadius: "16px", boxShadow: "0 16px 48px rgba(28,33,40,0.16)",
-            padding: "24px 28px", minWidth: "280px", width: "calc(100% - 40px)", maxWidth: "340px",
-          }}>
-            <div style={{ fontSize: "15px", fontWeight: "700", color: "var(--ink)", marginBottom: "6px" }}>
-              Reschedule to Upcoming
-            </div>
-            <div style={{ fontSize: "13px", color: "var(--slate-light)", marginBottom: "18px" }}>
-              Pick a date and this task will move to your Upcoming list.
-            </div>
-            <input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)}
-              style={{ width: "100%", marginBottom: "14px" }} autoFocus />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={confirmReschedule} disabled={!rescheduleDate}
-                style={{ flex: 1, opacity: rescheduleDate ? 1 : 0.5 }}>Reschedule</button>
-              <button onClick={cancelReschedule} className="btn-ghost" style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
