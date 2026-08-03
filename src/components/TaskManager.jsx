@@ -17,6 +17,37 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
+  // ── Multiselect ──────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [multiRescheduleDate, setMultiRescheduleDate] = useState("");
+  const [showMultiDatePicker, setShowMultiDatePicker] = useState(false);
+
+  function toggleSelect(taskId) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setShowMultiDatePicker(false);
+    setMultiRescheduleDate("");
+  }
+
+  async function rescheduleSelected() {
+    if (!multiRescheduleDate || !selectedIds.size) return;
+    await Promise.all(
+      [...selectedIds].map((id) =>
+        supabase.from("tasks").update({ scheduled_date: multiRescheduleDate }).eq("id", id)
+      )
+    );
+    clearSelection();
+    await loadTasks(selectedFolder);
+  }
+  // ────────────────────────────────────────────────────────────
+
   async function loadFolders() {
     if (!user) return;
     const { data } = await supabase.from("folders").select("*").eq("user_id", user.id).order("name");
@@ -82,12 +113,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
     dragIndex.current = index;
     e.dataTransfer.setData("taskId", String(task.id));
     e.dataTransfer.effectAllowed = "move";
-    // Do NOT call setDraggingIndex synchronously here. Triggering a React
-    // re-render (which changes this row's opacity) in the same tick as
-    // dragstart can interrupt the browser's native drag-image capture.
-    // On Chromium this is a known way to get stuck in a phantom drag
-    // session — cursor pinned to "grabbing", input swallowed, requiring
-    // a hard refresh to recover. Deferring to the next tick avoids it.
     setTimeout(() => setDraggingIndex(index), 0);
   }
 
@@ -97,9 +122,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
 
   function handleDrop(dropIndex) {
     const from = dragIndex.current;
-    // Always clear drag state immediately and synchronously — never wait on
-    // a network call to do this, or the row sits dimmed/unresponsive until
-    // the request resolves (or forever, if it silently fails).
     dragIndex.current = null;
     setDraggingIndex(null);
     setDragOverIndex(null);
@@ -110,8 +132,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
     const [moved] = reordered.splice(from, 1);
     reordered.splice(dropIndex, 0, moved);
 
-    // Optimistic UI: reflect the new order right away instead of waiting
-    // on Supabase, then persist in the background.
     setTasks((prev) => {
       const reorderedIds = reordered.map((t) => t.id);
       const rest = prev.filter((t) => !reorderedIds.includes(t.id));
@@ -127,7 +147,7 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
       .then(() => loadTasks(selectedFolder))
       .catch((err) => {
         console.error("Failed to save reorder:", err);
-        loadTasks(selectedFolder); // resync with server truth on failure
+        loadTasks(selectedFolder);
       });
   }
 
@@ -137,10 +157,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
     setDragOverIndex(null);
   }
 
-  // Safety net: if a drop happens somewhere the row's own handlers don't
-  // cover (e.g. the browser cancels the drag, or focus/DOM changes mid-drag
-  // suppress the row's dragend), this guarantees the dimmed/dragging state
-  // never gets stuck indefinitely.
   useEffect(() => {
     function clearDragState() {
       dragIndex.current = null;
@@ -208,7 +224,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
           <button onClick={() => setSelectedProject("")} className="delete-icon" title="Clear filter" style={{ fontSize: "16px", fontWeight: "700" }}>✕</button>
         )}
 
-        {/* Native date input — shows dd-mm-yyyy placeholder, single click opens picker */}
         <input
           type="date"
           value={scheduledDate}
@@ -223,135 +238,220 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
         <button onClick={createTask}>Add</button>
       </div>
 
+      {/* ── Multiselect badge ── */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          marginBottom: "14px",
+          padding: "10px 14px",
+          background: "var(--sage-pale)",
+          borderRadius: "10px",
+          border: "1px solid var(--sage)",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "10px",
+        }}>
+          <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--sage-deep)" }}>
+            {selectedIds.size} task{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+
+          {/* Date picker + reschedule inline */}
+          {showMultiDatePicker ? (
+            <>
+              <input
+                type="date"
+                value={multiRescheduleDate}
+                onChange={(e) => setMultiRescheduleDate(e.target.value)}
+                autoFocus
+                style={{ height: "32px", fontSize: "13px", width: "150px" }}
+              />
+              <button
+                onClick={rescheduleSelected}
+                disabled={!multiRescheduleDate}
+                style={{ height: "32px", minHeight: "unset", padding: "0 14px", fontSize: "13px", opacity: multiRescheduleDate ? 1 : 0.5 }}
+              >
+                Reschedule
+              </button>
+              <button
+                onClick={() => { setShowMultiDatePicker(false); setMultiRescheduleDate(""); }}
+                className="btn-ghost"
+                style={{ height: "32px", minHeight: "unset", padding: "0 12px", fontSize: "13px" }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setShowMultiDatePicker(true)}
+              style={{ height: "32px", minHeight: "unset", padding: "0 14px", fontSize: "13px" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: "5px" }}>
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              Reschedule all
+            </button>
+          )}
+
+          <button
+            onClick={clearSelection}
+            style={{
+              all: "unset", cursor: "pointer", marginLeft: "auto",
+              fontSize: "12px", color: "var(--slate)", textDecoration: "underline",
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {activeTasks.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px", color: "#8b938d" }}>
           {selectedProject ? "No tasks for this project today" : "No tasks scheduled for today"}
         </div>
       )}
 
-      {activeTasks.map((task, index) => (
-        <div
-          key={task.id} className="task-row" draggable
-          onDragStart={(e) => handleDragStart(e, index, task)}
-          onDragEnter={() => handleDragEnter(index)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={() => handleDrop(index)} onDragEnd={handleDragEnd}
-          style={{
-            display: "flex", alignItems: "center", gap: "10px",
-            opacity: draggingIndex === index ? 0.4 : 1,
-            borderTop: dragOverIndex === index && draggingIndex !== index
-              ? "2px solid var(--sage)" : "2px solid transparent",
-          }}
-        >
-          {/* Drag handle — dragging only ever starts from here now */}
-          <div className="drag-handle" title="Drag to reorder">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </div>
-
-          <input type="checkbox" draggable={false} onChange={() => completeTask(task.id)} />
-
-          {/* Task info */}
-          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-            <div className="task-row-title">{task.title}</div>
-            {task.source_url && (
-              <a href={task.source_url} target="_blank" rel="noreferrer" draggable={false}
-                style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--sage-deep)", marginTop: "4px", textDecoration: "none" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+      {activeTasks.map((task, index) => {
+        const isSelected = selectedIds.has(task.id);
+        return (
+          <div
+            key={task.id} className="task-row" draggable
+            onDragStart={(e) => handleDragStart(e, index, task)}
+            onDragEnter={() => handleDragEnter(index)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(index)} onDragEnd={handleDragEnd}
+            style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              opacity: draggingIndex === index ? 0.4 : 1,
+              borderTop: dragOverIndex === index && draggingIndex !== index
+                ? "2px solid var(--sage)" : "2px solid transparent",
+              background: isSelected ? "var(--sage-pale)" : undefined,
+              borderLeft: isSelected ? "3px solid var(--sage)" : undefined,
+              transition: "background 0.12s, border-color 0.1s",
+            }}
+          >
+            {/* Drag handle — click to select/deselect, drag to reorder */}
+            <div
+              className="drag-handle"
+              title={isSelected ? "Click to deselect" : "Click to select · Drag to reorder"}
+              onClick={(e) => { e.stopPropagation(); toggleSelect(task.id); }}
+              style={{ color: isSelected ? "var(--sage-deep)" : undefined, opacity: isSelected ? 1 : undefined }}
+            >
+              {isSelected ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
-                View in {task.source || "source"}
-              </a>
-            )}
-            {task.repeat_type && task.repeat_type !== "none" && (
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#8b938d", marginTop: "4px" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                  <path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
                 </svg>
-                {task.repeat_type}
-              </div>
-            )}
-          </div>
-
-          {/* Controls: project + pencil for repeat + reschedule (mobile-only) + delete */}
-          <div className="task-row-controls" draggable={false} style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-            <div style={{ width: "140px" }} draggable={false}>
-              <SelectPopover
-                value={String(task.project_id || "")}
-                onChange={async (val) => {
-                  await supabase.from("tasks").update({ project_id: val || null }).eq("id", task.id);
-                  loadTasks(selectedFolder);
-                }}
-                options={projectOptions} placeholder="No project" size="sm"
-              />
+              )}
             </div>
 
-            {/* Pencil → repeat popover */}
-            <div draggable={false} style={{ display: "flex" }}>
-            <PencilPopover active={task.repeat_type && task.repeat_type !== "none"}>
-              {({ close }) => (
-                <div style={{ padding: "6px 0" }}>
-                  {["none", "daily", "weekly", "monthly"].map((val) => (
-                    <div
-                      key={val}
-                      onClick={async () => {
-                        await supabase.from("tasks").update({ repeat_type: val }).eq("id", task.id);
-                        loadTasks(selectedFolder);
-                        close();
-                      }}
-                      style={{
-                        padding: "10px 14px", fontSize: "13px", cursor: "pointer",
-                        fontWeight: (task.repeat_type || "none") === val ? "600" : "400",
-                        color: (task.repeat_type || "none") === val ? "var(--sage-deep)" : "var(--ink-soft)",
-                        background: (task.repeat_type || "none") === val ? "var(--sage-pale)" : "transparent",
-                        display: "flex", alignItems: "center", gap: "8px",
-                      }}
-                      onMouseEnter={(e) => { if ((task.repeat_type || "none") !== val) e.currentTarget.style.background = "rgba(28,33,40,0.04)"; }}
-                      onMouseLeave={(e) => { if ((task.repeat_type || "none") !== val) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {(task.repeat_type || "none") === val && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                      {(task.repeat_type || "none") !== val && <span style={{ width: 13 }} />}
-                      {REPEAT_LABELS[val]}
-                    </div>
-                  ))}
+            <input type="checkbox" draggable={false} onChange={() => completeTask(task.id)} />
+
+            {/* Task info */}
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+              <div className="task-row-title">{task.title}</div>
+              {task.source_url && (
+                <a href={task.source_url} target="_blank" rel="noreferrer" draggable={false}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--sage-deep)", marginTop: "4px", textDecoration: "none" }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  View in {task.source || "source"}
+                </a>
+              )}
+              {task.repeat_type && task.repeat_type !== "none" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#8b938d", marginTop: "4px" }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                  </svg>
+                  {task.repeat_type}
                 </div>
               )}
-            </PencilPopover>
             </div>
 
-            {/* Reschedule to Upcoming — mobile-only (hidden on desktop via CSS,
-                see .reschedule-btn in App.css). Desktop uses drag-and-drop only;
-                touch devices can't drag, so this is their equivalent action. */}
-            <button
-              className="icon-btn reschedule-btn"
-              draggable={false}
-              title="Reschedule to Upcoming"
-              onClick={() => onReschedule?.(task.id)}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </button>
+            {/* Controls: project + pencil for repeat + reschedule (mobile-only) + delete */}
+            <div className="task-row-controls" draggable={false} style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+              <div style={{ width: "140px" }} draggable={false}>
+                <SelectPopover
+                  value={String(task.project_id || "")}
+                  onChange={async (val) => {
+                    await supabase.from("tasks").update({ project_id: val || null }).eq("id", task.id);
+                    loadTasks(selectedFolder);
+                  }}
+                  options={projectOptions} placeholder="No project" size="sm"
+                />
+              </div>
 
-            <button className="delete-icon" draggable={false} title="Delete task" onClick={() => setTaskPendingDelete(task)}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
-                <path d="M10 11v6" /><path d="M14 11v6" />
-              </svg>
-            </button>
+              {/* Pencil → repeat popover */}
+              <div draggable={false} style={{ display: "flex" }}>
+              <PencilPopover active={task.repeat_type && task.repeat_type !== "none"}>
+                {({ close }) => (
+                  <div style={{ padding: "6px 0" }}>
+                    {["none", "daily", "weekly", "monthly"].map((val) => (
+                      <div
+                        key={val}
+                        onClick={async () => {
+                          await supabase.from("tasks").update({ repeat_type: val }).eq("id", task.id);
+                          loadTasks(selectedFolder);
+                          close();
+                        }}
+                        style={{
+                          padding: "10px 14px", fontSize: "13px", cursor: "pointer",
+                          fontWeight: (task.repeat_type || "none") === val ? "600" : "400",
+                          color: (task.repeat_type || "none") === val ? "var(--sage-deep)" : "var(--ink-soft)",
+                          background: (task.repeat_type || "none") === val ? "var(--sage-pale)" : "transparent",
+                          display: "flex", alignItems: "center", gap: "8px",
+                        }}
+                        onMouseEnter={(e) => { if ((task.repeat_type || "none") !== val) e.currentTarget.style.background = "rgba(28,33,40,0.04)"; }}
+                        onMouseLeave={(e) => { if ((task.repeat_type || "none") !== val) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {(task.repeat_type || "none") === val && (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                        {(task.repeat_type || "none") !== val && <span style={{ width: 13 }} />}
+                        {REPEAT_LABELS[val]}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PencilPopover>
+              </div>
+
+              <button
+                className="icon-btn reschedule-btn"
+                draggable={false}
+                title="Reschedule to Upcoming"
+                onClick={() => onReschedule?.(task.id)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </button>
+
+              <button className="delete-icon" draggable={false} title="Delete task" onClick={() => setTaskPendingDelete(task)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" /><path d="M14 11v6" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       <ConfirmDialog
         open={taskPendingDelete !== null}
