@@ -89,6 +89,22 @@ function Sidebar({ setCurrentPage, user, onDragToUpcoming }) {
   function handleUpcomingDrop(e) {
     e.preventDefault();
     setUpcomingDragOver(false);
+
+    // Multi-task drag (from a multiselect in TaskManager)
+    const taskIdsRaw = e.dataTransfer.getData("taskIds");
+    if (taskIdsRaw) {
+      try {
+        const ids = JSON.parse(taskIdsRaw);
+        if (Array.isArray(ids) && ids.length && onDragToUpcoming) {
+          onDragToUpcoming(ids);
+          return;
+        }
+      } catch {
+        // fall through to single-task handling
+      }
+    }
+
+    // Single-task drag
     const taskId = e.dataTransfer.getData("taskId");
     if (taskId && onDragToUpcoming) onDragToUpcoming(taskId);
   }

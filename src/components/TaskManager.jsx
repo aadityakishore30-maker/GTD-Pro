@@ -19,10 +19,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
 
   // ── Multiselect ──────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [dropZoneActive, setDropZoneActive] = useState(false);
-  const [dropZoneOver, setDropZoneOver] = useState(false);
-  const [multiRescheduleDate, setMultiRescheduleDate] = useState("");
-  const [showDateInput, setShowDateInput] = useState(false);
 
   function toggleSelect(taskId) {
     setSelectedIds((prev) => {
@@ -30,30 +26,17 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
       next.has(taskId) ? next.delete(taskId) : next.add(taskId);
       return next;
     });
-    setShowDateInput(false);
-    setMultiRescheduleDate("");
   }
 
   function clearSelection() {
     setSelectedIds(new Set());
-    setDropZoneActive(false);
-    setDropZoneOver(false);
-    setShowDateInput(false);
-    setMultiRescheduleDate("");
   }
 
-  async function rescheduleSelected() {
-    if (!multiRescheduleDate || !selectedIds.size) return;
-    await Promise.all(
-      [...selectedIds].map((id) =>
-        supabase.from("tasks")
-          .update({ scheduled_date: multiRescheduleDate })
-          .eq("id", id)
-      )
-    );
-    clearSelection();
-    await loadTasks(selectedFolder);
-  }
+  // Clear selection once a reschedule (single or multi) has gone through
+  useEffect(() => {
+    if (refreshTrigger) clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTrigger]);
   // ────────────────────────────────────────────────────────────
 
   async function loadFolders() {
@@ -119,12 +102,15 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
 
   function handleDragStart(e, index, task) {
     dragIndex.current = index;
-    e.dataTransfer.setData("taskId", String(task.id));
-    e.dataTransfer.effectAllowed = "move";
-    // Show drop zone if this task is part of a multi-selection
+    // If this task is part of a multi-selection, drag the whole selection.
+    // Otherwise drag just this one task — both paths are readable by the
+    // Sidebar's Upcoming drop zone.
     if (selectedIds.has(task.id) && selectedIds.size > 1) {
-      setTimeout(() => setDropZoneActive(true), 0);
+      e.dataTransfer.setData("taskIds", JSON.stringify([...selectedIds]));
+    } else {
+      e.dataTransfer.setData("taskId", String(task.id));
     }
+    e.dataTransfer.effectAllowed = "move";
     setTimeout(() => setDraggingIndex(index), 0);
   }
 
@@ -137,7 +123,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
     dragIndex.current = null;
     setDraggingIndex(null);
     setDragOverIndex(null);
-    setDropZoneActive(false);
 
     if (from === null || from === dropIndex) return;
 
@@ -168,32 +153,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
     dragIndex.current = null;
     setDraggingIndex(null);
     setDragOverIndex(null);
-    setDropZoneActive(false);
-    setDropZoneOver(false);
-  }
-
-  // Drop zone handlers — the reschedule target
-  function handleDropZoneDragOver(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDropZoneOver(true);
-    setDragOverIndex(null); // don't highlight any row when over zone
-  }
-
-  function handleDropZoneDragLeave() {
-    setDropZoneOver(false);
-  }
-
-  function handleDropZoneDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    dragIndex.current = null;
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-    setDropZoneOver(false);
-    setDropZoneActive(false);
-    // Show inline date picker to pick the reschedule date
-    setShowDateInput(true);
   }
 
   useEffect(() => {
@@ -201,8 +160,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
       dragIndex.current = null;
       setDraggingIndex(null);
       setDragOverIndex(null);
-      setDropZoneActive(false);
-      setDropZoneOver(false);
     }
     window.addEventListener("dragend", clearDragState);
     window.addEventListener("drop", clearDragState);
@@ -284,34 +241,10 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
           <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--sage-deep)" }}>
             {selectedIds.size} task{selectedIds.size > 1 ? "s" : ""} selected
           </span>
-          {selectedIds.size > 1 && !showDateInput && (
+          {selectedIds.size > 1 && (
             <span style={{ fontSize: "12px", color: "var(--slate)" }}>
-              — drag any selected task to the zone below to reschedule all
+              — drag any selected task to "Upcoming" in the sidebar to reschedule all of them at once
             </span>
-          )}
-          {showDateInput && (
-            <>
-              <input
-                type="date" value={multiRescheduleDate}
-                onChange={(e) => setMultiRescheduleDate(e.target.value)}
-                autoFocus
-                style={{ height: "32px", fontSize: "13px", width: "150px" }}
-              />
-              <button
-                onClick={rescheduleSelected}
-                disabled={!multiRescheduleDate}
-                style={{ height: "32px", minHeight: "unset", padding: "0 14px", fontSize: "13px", opacity: multiRescheduleDate ? 1 : 0.5 }}
-              >
-                Reschedule {selectedIds.size} tasks
-              </button>
-              <button
-                onClick={() => { setShowDateInput(false); setMultiRescheduleDate(""); }}
-                className="btn-ghost"
-                style={{ height: "32px", minHeight: "unset", padding: "0 12px", fontSize: "13px" }}
-              >
-                Cancel
-              </button>
-            </>
           )}
           <button onClick={clearSelection} style={{
             all: "unset", cursor: "pointer", marginLeft: "auto",
@@ -457,67 +390,6 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
           </div>
         );
       })}
-
-      {/* ── Drop zone — appears while dragging a selected task ── */}
-      {(dropZoneActive || showDateInput) && selectedIds.size > 1 && (
-        <div
-          onDragOver={handleDropZoneDragOver}
-          onDragLeave={handleDropZoneDragLeave}
-          onDrop={handleDropZoneDrop}
-          style={{
-            marginTop: "12px",
-            borderRadius: "12px",
-            border: `2px dashed ${dropZoneOver ? "var(--sage-deep)" : "var(--sage)"}`,
-            background: dropZoneOver ? "var(--sage-pale)" : "rgba(74,124,110,0.04)",
-            padding: showDateInput ? "16px 20px" : "22px",
-            textAlign: "center",
-            transition: "all 0.15s ease",
-            display: "flex",
-            flexDirection: showDateInput ? "row" : "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "12px",
-          }}
-        >
-          {!showDateInput ? (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                fill="none" stroke="var(--sage)" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              <div style={{ fontSize: "13px", fontWeight: "600", color: "var(--sage-deep)" }}>
-                Drop here to reschedule {selectedIds.size} tasks
-              </div>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--sage-deep)", whiteSpace: "nowrap" }}>
-                Pick date for {selectedIds.size} tasks:
-              </span>
-              <input
-                type="date" value={multiRescheduleDate}
-                onChange={(e) => setMultiRescheduleDate(e.target.value)}
-                autoFocus
-                style={{ height: "36px", fontSize: "13px", width: "160px" }}
-              />
-              <button
-                onClick={rescheduleSelected}
-                disabled={!multiRescheduleDate}
-                style={{ height: "36px", minHeight: "unset", padding: "0 16px", fontSize: "13px", opacity: multiRescheduleDate ? 1 : 0.5 }}
-              >
-                Confirm
-              </button>
-              <button onClick={clearSelection} className="btn-ghost"
-                style={{ height: "36px", minHeight: "unset", padding: "0 12px", fontSize: "13px" }}>
-                Cancel
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
       <ConfirmDialog
         open={taskPendingDelete !== null}

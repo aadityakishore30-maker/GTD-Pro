@@ -13,7 +13,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [rescheduleTaskId, setRescheduleTaskId] = useState(null);
+  const [rescheduleTaskIds, setRescheduleTaskIds] = useState(null); // array | null
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -30,22 +30,27 @@ function App() {
 
   if (!session) return <Login />;
 
-  function handleDragToUpcoming(taskId) {
-    setRescheduleTaskId(taskId);
+  // Accepts either a single task id or an array of ids (multiselect drag)
+  function handleDragToUpcoming(idOrIds) {
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    setRescheduleTaskIds(ids);
     setRescheduleDate("");
   }
 
   async function confirmReschedule() {
-    if (!rescheduleDate || !rescheduleTaskId) return;
-    const { error } = await supabase.from("tasks").update({ scheduled_date: rescheduleDate }).eq("id", rescheduleTaskId);
+    if (!rescheduleDate || !rescheduleTaskIds?.length) return;
+    const { error } = await supabase
+      .from("tasks")
+      .update({ scheduled_date: rescheduleDate })
+      .in("id", rescheduleTaskIds);
     if (error) { alert(error.message); return; }
-    setRescheduleTaskId(null);
+    setRescheduleTaskIds(null);
     setRescheduleDate("");
     setRefreshTrigger((n) => n + 1); // tell Dashboard/TaskManager to re-fetch
     // Stay on Today's page
   }
 
-  function cancelReschedule() { setRescheduleTaskId(null); setRescheduleDate(""); }
+  function cancelReschedule() { setRescheduleTaskIds(null); setRescheduleDate(""); }
 
   const PAGE_TITLES = {
     dashboard: "Today",
@@ -61,6 +66,8 @@ function App() {
     archive: "Completed work, safely stored away.",
     captured: "Newly arrived, waiting to be sorted.",
   };
+
+  const rescheduleCount = rescheduleTaskIds?.length || 0;
 
   return (
     <div className="app">
@@ -95,8 +102,8 @@ function App() {
         {currentPage === "captured" && <Captured user={session.user} />}
       </main>
 
-      {/* Drag-to-Upcoming reschedule modal */}
-      {rescheduleTaskId && (
+      {/* Drag-to-Upcoming reschedule modal — handles single or multiple tasks */}
+      {rescheduleCount > 0 && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200,
           display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div onClick={cancelReschedule}
@@ -111,13 +118,15 @@ function App() {
               Reschedule to Upcoming
             </div>
             <div style={{ fontSize: "13px", color: "var(--slate-light)", marginBottom: "18px" }}>
-              Pick a date and this task will move to your Upcoming list.
+              Pick a date and {rescheduleCount > 1 ? `these ${rescheduleCount} tasks` : "this task"} will move to your Upcoming list.
             </div>
             <input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)}
               style={{ width: "100%", marginBottom: "14px" }} autoFocus />
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={confirmReschedule} disabled={!rescheduleDate}
-                style={{ flex: 1, opacity: rescheduleDate ? 1 : 0.5 }}>Reschedule</button>
+                style={{ flex: 1, opacity: rescheduleDate ? 1 : 0.5 }}>
+                Reschedule{rescheduleCount > 1 ? ` ${rescheduleCount}` : ""}
+              </button>
               <button onClick={cancelReschedule} className="btn-ghost" style={{ flex: 1 }}>Cancel</button>
             </div>
           </div>
