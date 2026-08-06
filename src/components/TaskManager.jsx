@@ -39,6 +39,48 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
   }, [refreshTrigger]);
   // ────────────────────────────────────────────────────────────
 
+  // ── Inline title editing ─────────────────────────────────────
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const editInputRef = useRef(null);
+
+  function startEditing(task) {
+    setEditingTaskId(task.id);
+    setEditingTitle(task.title);
+  }
+
+  function cancelEditing() {
+    setEditingTaskId(null);
+    setEditingTitle("");
+  }
+
+  async function saveEditedTitle() {
+    const trimmed = editingTitle.trim();
+    if (!editingTaskId || !trimmed) { cancelEditing(); return; }
+
+    const task = tasks.find((t) => t.id === editingTaskId);
+    if (task && trimmed === task.title) { cancelEditing(); return; }
+
+    const { error } = await supabase.from("tasks").update({ title: trimmed }).eq("id", editingTaskId);
+    if (error) { alert(error.message); cancelEditing(); return; }
+
+    setTasks((prev) => prev.map((t) => (t.id === editingTaskId ? { ...t, title: trimmed } : t)));
+    cancelEditing();
+  }
+
+  function handleEditKeyDown(e) {
+    if (e.key === "Enter") { e.preventDefault(); saveEditedTitle(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
+  }
+
+  useEffect(() => {
+    if (editingTaskId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingTaskId]);
+  // ────────────────────────────────────────────────────────────
+
   async function loadFolders() {
     if (!user) return;
     const { data } = await supabase.from("folders").select("*").eq("user_id", user.id).order("name");
@@ -263,9 +305,10 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
 
       {activeTasks.map((task, index) => {
         const isSelected = selectedIds.has(task.id);
+        const isEditing = editingTaskId === task.id;
         return (
           <div
-            key={task.id} className="task-row" draggable
+            key={task.id} className="task-row" draggable={!isEditing}
             onDragStart={(e) => handleDragStart(e, index, task)}
             onDragEnter={() => handleDragEnter(index)}
             onDragOver={(e) => e.preventDefault()}
@@ -302,7 +345,30 @@ function TaskManager({ user, onReschedule, refreshTrigger }) {
             <input type="checkbox" draggable={false} onChange={() => completeTask(task.id)} />
 
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-              <div className="task-row-title">{task.title}</div>
+              {isEditing ? (
+                <input
+                  ref={editInputRef}
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  onBlur={saveEditedTitle}
+                  draggable={false}
+                  style={{
+                    font: "inherit", fontWeight: "inherit", color: "inherit",
+                    padding: "2px 6px", border: "1px solid var(--sage)",
+                    borderRadius: "6px", width: "100%", background: "var(--paper)",
+                  }}
+                />
+              ) : (
+                <div
+                  className="task-row-title"
+                  onDoubleClick={(e) => { e.stopPropagation(); startEditing(task); }}
+                  title="Double-click to edit"
+                  style={{ cursor: "text" }}
+                >
+                  {task.title}
+                </div>
+              )}
               {task.source_url && (
                 <a href={task.source_url} target="_blank" rel="noreferrer" draggable={false}
                   style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--sage-deep)", marginTop: "4px", textDecoration: "none" }}>
