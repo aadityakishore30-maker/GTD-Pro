@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
-import ConfirmDialog from "../components/ConfirmDialog";
+import ConfirmDialog from "./ConfirmDialog";
 
 function FolderManager({ user }) {
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState("");
 
-  const [selectedFolder, setSelectedFolder] =
-    useState(
-      localStorage.getItem("selectedFolder") || ""
-    );
+  const [selectedFolder, setSelectedFolder] = useState(
+    localStorage.getItem("selectedFolder") || ""
+  );
 
-  const [folderPendingDelete, setFolderPendingDelete] =
-    useState(null);
+  const [folderPendingDelete, setFolderPendingDelete] = useState(null);
+
+  // Tracks which folder is currently being hovered while dragging
+  const [dragOverFolderId, setDragOverFolderId] = useState(null);
 
   async function loadFolders() {
     if (!user) return;
@@ -39,7 +40,7 @@ function FolderManager({ user }) {
       .from("folders")
       .insert([
         {
-          name: folderName,
+          name: folderName.trim(),
           user_id: user.id,
         },
       ]);
@@ -121,6 +122,113 @@ function FolderManager({ user }) {
     await loadFolders();
   }
 
+  // ------------------------------------------------------------
+  // DRAG & DROP
+  // Move one or multiple tasks into this folder
+  // ------------------------------------------------------------
+
+  function handleFolderDragOver(e, folderId) {
+    e.preventDefault();
+
+    // Tell the browser this is a valid move/drop target
+    e.dataTransfer.dropEffect = "move";
+
+    setDragOverFolderId(folderId);
+  }
+
+  function handleFolderDragLeave(e, folderId) {
+    // Only clear the highlight when actually leaving the folder.
+    // This prevents flickering when moving over children inside it.
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverFolderId(null);
+    }
+  }
+
+  async function handleFolderDrop(e, folderId) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setDragOverFolderId(null);
+
+    if (!user) return;
+
+    let taskIds = [];
+
+    // Multi-select drag
+    const multipleTaskIds = e.dataTransfer.getData("taskIds");
+
+    if (multipleTaskIds) {
+      try {
+        const parsedIds = JSON.parse(multipleTaskIds);
+
+        if (Array.isArray(parsedIds)) {
+          taskIds = parsedIds;
+        }
+      } catch (error) {
+        console.error("Could not read dragged task IDs:", error);
+      }
+    }
+
+    // Single-task drag
+    if (taskIds.length === 0) {
+      const singleTaskId = e.dataTransfer.getData("taskId");
+
+      if (singleTaskId) {
+        taskIds = [singleTaskId];
+      }
+    }
+
+    if (taskIds.length === 0) {
+      console.warn("No task ID found in dragged data.");
+      return;
+    }
+
+    // Remove duplicates and ignore empty values
+    taskIds = [
+      ...new Set(
+        taskIds
+          .filter(Boolean)
+          .map((id) => String(id))
+      ),
+    ];
+
+    console.log(
+      "Moving tasks:",
+      taskIds,
+      "to folder:",
+      folderId
+    );
+
+    // Update the folder_id for all dragged tasks.
+    // user_id is included so a user can only move their own tasks.
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        folder_id: folderId,
+      })
+      .in("id", taskIds)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Failed to move tasks:", error);
+      alert(`Could not move task(s): ${error.message}`);
+      return;
+    }
+
+    // Make the destination folder the active folder so the user
+    // can immediately see the moved task(s).
+    localStorage.setItem(
+      "selectedFolder",
+      String(folderId)
+    );
+
+    setSelectedFolder(String(folderId));
+
+    // Reload so TaskManager fetches the correct folder's tasks
+    // from Supabase and clears the existing drag/selection state.
+    window.location.reload();
+  }
+
   useEffect(() => {
     loadFolders();
   }, [user]);
@@ -148,6 +256,11 @@ function FolderManager({ user }) {
             setFolderName(e.target.value)
           }
           placeholder="Create new folder..."
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              createFolder();
+            }
+          }}
         />
 
         <button onClick={createFolder}>
@@ -162,57 +275,98 @@ function FolderManager({ user }) {
           gap: "8px",
         }}
       >
-        {folders.map((folder) => (
-          <div
-            key={folder.id}
-            className={
-              "folder-item" +
-              (String(selectedFolder) ===
-              String(folder.id)
-                ? " selected"
-                : "")
-            }
-            onClick={() => {
-              localStorage.setItem(
-                "selectedFolder",
-                folder.id
-              );
+        {folders.map((folder) => {
+          const isSelected =
+            String(selectedFolder) === String(folder.id);
 
-              window.location.reload();
-            }}
-          >
-            <span style={{ flex: 1 }}>
-              {folder.name}
-            </span>
+          const isDragOver =
+            String(dragOverFolderId) === String(folder.id);
 
-            <button
-              className="delete-icon"
-              title="Delete folder"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFolderPendingDelete(folder);
+          return (
+            <div
+              key={folder.id}
+              className={
+                "folder-item" +
+                (isSelected ? " selected" : "")
+              }
+              onClick={() => {
+                localStorage.setItem(
+                  "selectedFolder",
+                  folder.id
+                );
+
+                window.location.reload();
+              }}
+              onDragOver={(e) =>
+                handleFolderDragOver(e, folder.id)
+              }
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragOverFolderId(folder.id);
+              }}
+              onDragLeave={(e) =>
+                handleFolderDragLeave(e, folder.id)
+              }
+              onDrop={(e) =>
+                handleFolderDrop(e, folder.id)
+              }
+              style={{
+                position: "relative",
+
+                // Preserve the existing folder appearance
+                // while adding a clear drop state.
+                outline: isDragOver
+                  ? "2px dashed var(--sage)"
+                  : "2px solid transparent",
+
+                background: isDragOver
+                  ? "var(--sage-pale)"
+                  : undefined,
+
+                transform: isDragOver
+                  ? "scale(1.01)"
+                  : "scale(1)",
+
+                transition:
+                  "background 0.12s, outline 0.12s, transform 0.12s",
+
+                cursor: "pointer",
               }}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <span style={{ flex: 1 }}>
+                {folder.name}
+              </span>
+
+              <button
+                className="delete-icon"
+                title="Delete folder"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDragOverFolderId(null);
+                  setFolderPendingDelete(folder);
+                }}
               >
-                <path d="M3 6h18" />
-                <path d="M8 6V4h8v2" />
-                <path d="M19 6l-1 14H6L5 6" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
-              </svg>
-            </button>
-          </div>
-        ))}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                </svg>
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <ConfirmDialog
